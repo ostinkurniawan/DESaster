@@ -267,26 +267,36 @@ def output_summary(entities, entity_type):
         num_damaged = 0
         num_rebuilt = 0
         num_gave_up_funding_search = 0
-        num_relocated = 0
-        num_homesearch = 0
-        num_gave_up_home_search = 0
+        num_home_buy_get = 0
+        num_home_buy_put = 0
+        num_home_rent_get = 0
+        num_home_rent_put = 0
+        num_gave_up_home_buy_search = 0
+        num_gave_up_home_rent_search = 0
         num_vacant_fixed = 0
 
         for household in entities:
-            if household.residence.damage_state != None: num_damaged += 1
+            if household.residence.damage_state_start != None: num_damaged += 1
             if household.repair_get != None: num_rebuilt += 1
             if household.gave_up_funding_search: num_gave_up_funding_search += 1
-            if household.home_put != None: num_homesearch += 1
-            if household.home_get != None: num_relocated += 1
-            if household.gave_up_home_search: num_gave_up_home_search += 1
-          
+            if household.home_buy_put != None: num_home_buy_put += 1
+            if household.home_buy_get != None: num_home_buy_get += 1
+            if household.home_rent_put != None: num_home_buy_put += 1
+            if household.home_rent_get != None: num_home_buy_get += 1
+            if household.gave_up_home_buy_search: num_gave_up_home_buy_search += 1
+            if household.gave_up_home_rent_search: num_gave_up_home_rent_search += 1
+
         print('{0} out of {1} owners suffered damage to their homes.\n'.format(num_damaged, len(entities)),
           '{0} out of {1} owners rebuilt or repaired their damaged home.\n'.format(num_rebuilt, len(entities)),
             '{0} out of {1} owners gave up searching for money.\n'.format(num_gave_up_funding_search, len(entities)),
-          '{0} out of {1} owners searchesd for a new home.\n'.format(num_homesearch, len(entities)),
-            '{0} out of {1} owners bought a new home.\n'.format(num_relocated, len(entities)),
-            '{0} out of {1} owners gave up searching for a home.'.format(num_gave_up_home_search, len(entities))
+          '{0} out of {1} owners searched to buy a new home.\n'.format(num_home_buy_put, len(entities)),
+            '{0} out of {1} owners bought a new home.\n'.format(num_home_buy_get, len(entities)),
+            '{0} out of {1} owners searched to temporarily rent a new home.\n'.format(num_home_rent_put, len(entities)),
+              '{0} out of {1} owners rented a temporary home.\n'.format(num_home_rent_get, len(entities)),
+            '{0} out of {1} owners gave up searching to buy a home.'.format(num_gave_up_home_buy_search, len(entities)),
+            '{0} out of {1} owners gave up searching to rent a temporary home.'.format(num_gave_up_home_rent_search, len(entities))
             )
+            
     if entity_type.lower() in ['renterhousehold', 'renter household']:
         num_damaged = 0
         num_rebuilt = 0
@@ -318,12 +328,13 @@ def households_to_df(entities):
     *** Needs to be generalized, e.g., so can process RenterHouseholds. ***
     
     """
-    attributes = list(vars(entities[0]).keys()) #gets all potential column names
-    attributes.extend(list(vars(entities[0].residence).keys()))
+    entities_copy = entities
+    attributes = list(vars(entities_copy[0]).keys()) #gets all potential column names
+    attributes.extend(list(vars(entities_copy[0].residence).keys()))
     df = pd.DataFrame(columns=attributes)
     new_column={}
      
-    for i in entities: #loop through all entities
+    for i in entities_copy: #loop through all entities
         
         i.story = i.story_to_text()
         i.stock = np.nan
@@ -340,6 +351,7 @@ def households_to_df(entities):
             i.bedrooms = i.prior_residences[0].bedrooms
             i.address = i.prior_residences[0].address
             i.listed = i.prior_residences[0].listed
+            i.tenure = i.prior_residences[0].tenure
             i.value = i.prior_residences[0].value
             i.permit = i.prior_residences[0].permit
             i.monthly_cost = i.prior_residences[0].monthly_cost
@@ -362,6 +374,7 @@ def households_to_df(entities):
             i.bedrooms = i.residence.bedrooms
             i.address = i.residence.address
             i.listed = i.residence.listed
+            i.tenure = i.residence.tenure
             i.value = i.residence.value
             i.permit = i.residence.permit
             i.monthly_cost = i.residence.monthly_cost

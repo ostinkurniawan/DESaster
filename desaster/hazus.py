@@ -116,5 +116,5 @@ def setRecoveryLimitState(building):
     recovery_limit_state_dist = rv_discrete(values=([0, 1, 2, 3, 4],
                                 recovery_limit_states.loc[building.damage_state].values))
     recovery_limit_state_code = recovery_limit_state_dist.rvs()
-    code_label_lookup = {0: 'Functional', 1: 'Disfunctional', 2: 'Unsafe', 3: 'Irreparable', 4: 'Collapse'}
+    code_label_lookup = {0: 'Functional', 1: 'Disfunctional', 2: 'Unsafe', 3: 'Irreparable', 4: 'Collapsed'}
     building.recovery_limit_state = code_label_lookup[recovery_limit_state_code]

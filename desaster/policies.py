@@ -57,7 +57,7 @@ class FinancialRecoveryPolicy(object):
     def writeCompletedWithEnough(self, entity, search_duration):
         if entity.write_story:
             entity.story.append(
-                'It took {0} {1:.0f} days to exhaust financial assistance options and now has ${2:,.0f} for repairs. '.format(
+                'It took {0} {1:.0f} days to exhaust financial assistance options and now has ${2:,.0f} for repairs or replacement. '.format(
                         entity.name.title(), search_duration, entity.recovery_funds.level)
                 )
 
