@@ -323,88 +323,57 @@ def households_to_df(entities):
     """
     
     *** This works but is a bandaid for saving simulation outputs 
-    for external visualization or stats. *** Create output file for visualizing ***
+    for external visualization or stats. 
     
-    *** Needs to be generalized, e.g., so can process RenterHouseholds. ***
+    *** Eventually add an option so can recursively flatten each prior residence
     
     """
-    entities_copy = entities
-    attributes = list(vars(entities_copy[0]).keys()) #gets all potential column names
-    attributes.extend(list(vars(entities_copy[0].residence).keys()))
-    df = pd.DataFrame(columns=attributes)
-    new_column={}
-     
-    for i in entities_copy: #loop through all entities
+    column_list = []
+
+    for entity in entities: #loop through all entities
+        new_column={}
         
-        i.story = i.story_to_text()
-        i.stock = np.nan
-        
-        # Add residence attributes to entity level
-        # This exports attributes of first (or only) residence
+        # Create list of residence attributes. Delete attributes that are lists themselves.
+        entity_attributes = list(vars(entities[0]).keys()) #gets all potential column names
+        entity_attributes.remove('residence')
+        entity_attributes.remove('prior_residences')
+        entity_attributes.remove('env')
+        entity_attributes.remove('write_story')
+
+        # Catch exception. RenterHousehold won't have property.
         try:
-            i.latitude = i.prior_residences[0].latitude
-            i.longitude = i.prior_residences[0].longitude
-            i.damage_state_start = i.prior_residences[0].damage_state_start
-            i.damage_state = i.prior_residences[0].damage_state
-            i.damage_value = i.prior_residences[0].damage_value    
-            i.area = i.prior_residences[0].area
-            i.bedrooms = i.prior_residences[0].bedrooms
-            i.address = i.prior_residences[0].address
-            i.listed = i.prior_residences[0].listed
-            i.tenure = i.prior_residences[0].tenure
-            i.value = i.prior_residences[0].value
-            i.permit = i.prior_residences[0].permit
-            i.monthly_cost = i.prior_residences[0].monthly_cost
-            i.bathrooms = i.prior_residences[0].bathrooms
-            i.inspected = i.prior_residences[0].inspected
-            i.occupancy = i.prior_residences[0].occupancy
-            i.owner = i.prior_residences[0].owner
-            i.damage_value_start = i.prior_residences[0].damage_value_start
-            i.recovery_limit_state_start = i.prior_residences[0].recovery_limit_state_start
-            i.recovery_limit_state = i.prior_residences[0].recovery_limit_state
-            i.assessment = i.prior_residences[0].assessment
-            
-        except IndexError:
-            i.latitude = i.residence.latitude
-            i.longitude = i.residence.longitude
-            i.damage_state_start = i.residence.damage_state_start
-            i.damage_state = i.residence.damage_state
-            i.damage_value = i.residence.damage_value    
-            i.area = i.residence.area
-            i.bedrooms = i.residence.bedrooms
-            i.address = i.residence.address
-            i.listed = i.residence.listed
-            i.tenure = i.residence.tenure
-            i.value = i.residence.value
-            i.permit = i.residence.permit
-            i.monthly_cost = i.residence.monthly_cost
-            i.bathrooms = i.residence.bathrooms
-            i.inspected = i.residence.inspected
-            i.occupancy = i.residence.occupancy
-            i.owner = i.residence.owner
-            i.damage_value_start = i.residence.damage_value_start
-            i.recovery_limit_state_start = i.residence.recovery_limit_state_start
-            i.recovery_limit_state = i.residence.recovery_limit_state
-            i.assessment = i.residence.assessment
+            entity_attributes.remove('property')
+            entity_attributes.remove('prior_properties')
+        except ValueError:
+            pass
         
-        i.residence = np.nan
-        i.prior_residences = np.nan
-        
-        #loop through the attributes in our list of column names we want
-        for attribute in attributes: 
+        #loop through the entity-level attributes and assign to new column
+        for attribute in entity_attributes: 
             try:
-                new_column[attribute] = i.__getattribute__(attribute)      
+                new_column[attribute] = entity.__getattribute__(attribute)      
             except ValueError:
                 new_column[attribute] = np.nan
             except AttributeError as e:
                 new_column[attribute] = np.nan
-                print("Household {0} had an attribrute error, {1}".format(i.name, e))
-            
-        #Turn newly made column into a dataframe where it can be combined with the df
-        df_column = pd.DataFrame([new_column]) 
-
-        df = df.append(df_column, ignore_index=True)
+                print("Household {0} had an attribrute error, {1}".format(entity.name, e))
         
-    return df
+        # Create list of residence attributes. Delete attributes that are lists themselves.
+        residence_attributes = list(vars(entities[0].residence).keys()) #gets all potential column names
+        residence_attributes.remove('owner')
+        residence_attributes.remove('stock')
 
-         
+        #loop through the residence-level attributes and assign to new column
+        for attribute in residence_attributes: 
+            try:
+                new_column[attribute] = entity.prior_residences[0].__getattribute__(attribute)      
+            except IndexError:
+                new_column[attribute] = entity.residence.__getattribute__(attribute) 
+            except AttributeError as e:
+                new_column[attribute] = np.nan
+                print("Household {0} had an attribrute error, {1}".format(entity.name, e))
+
+        #Appen newly made column to column list
+        column_list.append(new_column)
+    
+    # Create and return dataframe from list of attribute columns
+    return pd.DataFrame(column_list)
