@@ -9,7 +9,7 @@ importSingleFamilyResidenceStock
 """
 from scipy.stats import uniform, beta, weibull_min
 from simpy import FilterStore
-from desaster.entities import Owner, Household, OwnerHousehold, RenterHousehold, Landlord
+from desaster.entities import Household, OwnerHousehold, RenterHousehold, Landlord
 from desaster.structures import SingleFamilyResidential, Building
 import pandas as pd
 import numpy as np
@@ -79,47 +79,6 @@ def importEntities(env, entities_df, entity_type, building_stock = None, write_s
             
             entities.append(entity)
         return entities
-    elif entity_type.lower() == 'owner':
-        # Populate the env with entities from the entities dataframe
-        for i in entities_df.index:
-            if entities_df.iloc[i]['Occupancy'].lower() in ['single family house', 'single family home', 
-                                    'single family dwelling', 'single family residence',
-                                    'sfr', 'sfh', 'sfd', 'mobile home']:
-                real_property = SingleFamilyResidential(
-                                            occupancy = entities_df.iloc[i]['Occupancy'],
-                                            tenure = entities_df.iloc[i]['Tenure'],
-                                            address = entities_df.iloc[i]['Address'],
-                                            longitude = entities_df.iloc[i]['Longitude'],
-                                            latitude = entities_df.iloc[i]['Latitude'],
-                                            value = entities_df.iloc[i]['Value'],
-                                            cost = entities_df.iloc[i]['Monthly Cost'],
-                                            area = entities_df.iloc[i]['Area'],
-                                            bedrooms = entities_df.iloc[i]['Bedrooms'],
-                                            bathrooms = entities_df.iloc[i]['Bathrooms'],
-                                            listed = entities_df.iloc[i]['Listed'],
-                                            damage_state = entities_df.iloc[i]['Damage State'],
-                                            building_stock = building_stock
-                                                    )
-                                                    
-                
-            
-            else:
-                raise AttributeError("Specified occupancy type ({0}) associated with entity \'{1}\' not supported. Can't complete import.".format(entities_df.iloc[i]['Occupancy'], entities_df.iloc[i]['Name']))
-                return
-                
-            entity = Owner(env, 
-                            name = entities_df.iloc[i]['Name'],
-                            savings = entities_df.iloc[i]['Owner Savings'],
-                            insurance = entities_df.iloc[i]['Owner Insurance'],
-                            credit = entities_df.iloc[i]['Owner Credit'],
-                            write_story = write_story,
-                            real_property = real_property
-                            )
-
-            entity.property.owner = entity
-            building_stock.put(real_property)
-            entities.append(entity)    
-        return entities
     
     elif entity_type.lower() == 'ownerhousehold' or entity_type.lower() == 'owner household':
         # Populate the env with entities from the entities dataframe
@@ -142,9 +101,7 @@ def importEntities(env, entities_df, entity_type, building_stock = None, write_s
                                                     damage_state = entities_df.iloc[i]['Damage State'],
                                                     building_stock = building_stock
                                                     )
-                
-                
-                
+                        
             else:
                 raise AttributeError("Specified occupancy type ({0}) associated with entity \'{1}\' not supported. Can't complete import.".format(entities_df.iloc[i]['Occupancy'], entities_df.iloc[i]['Name']))
                 return
@@ -187,18 +144,8 @@ def importEntities(env, entities_df, entity_type, building_stock = None, write_s
             else:
                 raise AttributeError("Specified occupancy type ({0}) associated with entity \'{1}\' not supported. Can't complete import.".format(entities_df.iloc[i]['Occupancy'], entities_df.iloc[i]['Name']))
                 return                      
-
-            entity = RenterHousehold(env, 
-                                        name = entities_df.iloc[i]['Name'],
-                                        income = entities_df.iloc[i]['Income'],
-                                        savings = entities_df.iloc[i]['Tenant Savings'],
-                                        insurance = entities_df.iloc[i]['Tenant Insurance'],
-                                        credit = entities_df.iloc[i]['Tenant Credit'],
-                                        write_story = write_story,
-                                        residence = real_property
-                                        )
             
-            entity.landlord = Landlord(env, 
+            landlord = Landlord(env, 
                                         name = entities_df.iloc[i]['Landlord'],
                                         savings = entities_df.iloc[i]['Owner Savings'],
                                         insurance = entities_df.iloc[i]['Owner Insurance'],
@@ -206,11 +153,23 @@ def importEntities(env, entities_df, entity_type, building_stock = None, write_s
                                         real_property = real_property,
                                         write_story = write_story
                                         )
+            
+            entity = RenterHousehold(env, 
+                                        name = entities_df.iloc[i]['Name'],
+                                        income = entities_df.iloc[i]['Income'],
+                                        savings = entities_df.iloc[i]['Tenant Savings'],
+                                        insurance = entities_df.iloc[i]['Tenant Insurance'],
+                                        credit = entities_df.iloc[i]['Tenant Credit'],
+                                        write_story = write_story,
+                                        residence = real_property,
+                                        landlord = landlord
+                                        )
                     
             entity.landlord.tenant = entity
             entity.landlord.property.owner = entity.landlord
             building_stock.put(real_property)
             entities.append(entity)
+            
         return entities
     elif entity_type.lower() == 'landlord':
         # Populate the env with entities from the entities dataframe

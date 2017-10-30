@@ -4,8 +4,6 @@ Module of classes for implementing DESaster entities, such as households and
 businesses.
 
 Classes:
-Entity(object)
-Owner(Entity)
 Household(Entity)
 OwnerHousehold(Owner, Household)
 RenterHousehold(Entity, Household)
@@ -18,116 +16,7 @@ from desaster.hazus import setContentsDamageValueHAZUS
 import names, warnings, sys
 from simpy import Container
 
-class Entity(object):
-    """A base class for representing entities, such as households, businesses,
-    agencies, NGOs, etc.
-
-    Methods:
-    __init__(self, env, name, write_story = False)
-    story_to_text()
-    
-    """
-    def __init__(self, env, name = None, savings = 0, credit = 850, write_story = False):
-        """Initiate an Entity object
-
-        Keyword Arguments:
-        env -- Pointer to SimPy env environment.
-        name -- A string indicating the entities name.
-        savings -- Amount of entity savings in $ 
-        write_story -- Boolean indicating whether to track an entity's story.
-        
-        Modified Attributes
-        self.recovery_funds -- initiated with value of self.savings
-        """
-        self.env = env
-
-        # Entity attributes
-        self.name = name   # Name associated with occupant of the home %***%
-        self.write_story = write_story # Boolean. Whether to track the entity's story.
-        self.savings = savings  # Amount of entity savings in $
-        self.credit = credit # A FICO-like credit score
-
-        # Entity outputs
-        self.story = []  # The story of events for each entity
-
-        
-        try:
-            self.recovery_funds = Container(env, init=self.savings)  # Total funds available to entity to recover; must be > 0
-        except:
-            self.recovery_funds = Container(env, init=1)  # init must be > 0
-        
-        self.writeEntityAttributes()    
-        
-    def writeEntityAttributes(self):
-        if self.write_story:
-            self.story.append('{0} has ${1} of savings and a credit score of {2}. '.format(
-                                self.name, self.savings, self.credit)
-                            )
-            
-    def story_to_text(self):
-        """Join list of story strings into a single story string."""
-        return ''.join(self.story)
-
-class Owner(Entity):
-    """An class that inherits from the Entity() class to represent any entity
-    that owns property.  An owner does not necessarily have a residence (e.g., 
-    landlord). For the most part this is class is to define subclasses with Owner() 
-    attributes.
-
-    Methods:
-    __init__(self, env, name, attributes_df, building_stock, write_story = False)
-    """
-    def __init__(self, env, name = None, savings = 0, insurance = 0, credit = 0, real_property = None, write_story = False):
-        """Initiate several attributes related to an Owner entity.
-        No universal methods have been define for the Owner class yet. methods
-        are currently specified in subclasses of Owner.
-
-        Keyword Arguments:
-        env -- Pointer to SimPy env environment.
-        name -- A string indicating the entities name.
-        savings -- Amount of entity savings in $ 
-        insurance -- Hazard-specific insurance coverage: coverage / residence.value
-        credit -- A FICO-like credit score
-        real_property -- A building object, such as structures.SingleFamilyResidential()
-        write_story -- Boolean indicating whether to track an entity's story.
-        
-        Inheritance:
-        Subclass of entities.Entity()
-        """
-        Entity.__init__(self, env, name, savings, credit, write_story)
-
-        # Attributes
-        self.insurance = insurance  # Hazard-specific property insurance coverage: coverage / residence.value
-        self.property = real_property # A building object from desaster.structures
-
-        # Owner env outputs
-        self.inspection_put = None  # Time put request in for house inspection
-        self.inspection_get = None  # Time get  house inspection
-        self.claim_put = None  # Time put request in for insurance settlement
-        self.claim_get = None  # Time get insurance claim settled
-        self.claim_amount = 0.0  # Amount of insurance claim payout
-        self.fema_put = None  # Time put request in for FEMA assistance
-        self.fema_get = None  # Time get FEMA assistance
-        self.fema_amount = 0.0  # Amount of assistance provided by FEMA
-        self.sba_put = None  # Time put request for loan
-        self.sba_get = None  # Time get requested loan
-        self.sba_amount = 0.0  # Amount of loan received
-        self.assistance_payout = 0.0  # Amount of generic assistance provided (e.g., Red Cross)
-        self.repair_put = None  # Time put request in for house repair
-        self.repair_get = None  # Time get house repair completed
-        self.demolition_put = None # Time demolition requested
-        self.demolition_get = None  # Time demolition occurs
-        self.permit_put = None  # Time put request for building permit
-        self.permit_get = None  # Time get requested building permit
-        self.assessment_put = None  # Time put request for engineering assessment
-        self.assessment_get = None  # Time put request for engineering assessment
-        self.gave_up_funding_search = None  # Time entity gave up on some funding
-                                            # process; obviously can't keep track
-                                            # of multiple give ups
-        self.prior_properties = [] # A list to keep track of entity's previous properties
-        
-                            
-class Household(Entity):
+class Household:
     """Define a Household() class to represent a group of persons that reside
     together in a single dwelling unit. A Household() object can not own property,
     but does have a residence. For the most part this is class is to define
@@ -135,10 +24,21 @@ class Household(Entity):
     household stories.
 
     Methods:
-    __init__(self, env, name = None, savings = 0, insurance = 0, credit = 0, write_story = False)
+    __init__(self, env, name = None, income = float('inf'), savings = float('inf'), 
+                    credit = 850, residence = None, write_story = False)
+    
     ####### NEED TO UPDATE METHODS LIST ####
-    writeResides(self):
-    writeOccupy(self):  
+    
+    
+    buy_home(self, search_patience, building_stock)
+    rent_home(self, search_patience, building_stock)
+    occupy(self, duration, callbacks = None)
+    changeListing(self, listed)
+    writeAttributes(self)
+    writeOccupy(self): 
+    writeResides()
+    writeHomeBuy(self)
+    writeHomeRent(self): 
 
     """
     def __init__(self, env, name = None, income = float('inf'), savings = float('inf'), 
@@ -148,22 +48,41 @@ class Household(Entity):
         Keyword Arguments:
         env -- Pointer to SimPy env environment.
         name -- A string indicating the entities name.
+        
+        income -- Monthly amount of household earnings in $
         savings -- Amount of entity savings in $ 
         credit -- A FICO-like credit score
         residence -- A building object, such as structures.SingleFamilyResidential()
                     that serves as the entity's temporary or permanent residence.
-        write_story -- Boolean indicating whether to track a entitys story.
         
+        write_story -- Boolean indicating whether to track a entitys story.
+        story -- A list to contain the entity's story
         Returns or Attribute Changes:
         self.story -- If write_story == True, append entity story strings
+        self.recovery_funds -- initiated with value of self.savings
         """
-        Entity.__init__(self, env, name, savings, credit, write_story)
+        self.env = env
 
         # Attributes
-        self.residence = residence
+        self.name = name   # Name associated with occupant of the home %***%
+        self.write_story = write_story # Boolean. Whether to track the entity's story.
         self.income = income
+        self.savings = savings  # Amount of entity savings in $
+        self.credit = credit # A FICO-like credit score
+        self.residence = residence
 
         # Entity outputs
+        try:
+            if not self.story:  # Check to see if a story has already been started
+                self.story = [] # Initiate a list to contain the entity's story
+        except AttributeError:
+            self.story = []
+        
+        try:
+            self.recovery_funds = Container(env, init=self.savings)  # Total funds available to entity to recover; must be > 0
+        except:
+            self.recovery_funds = Container(env, init=1)  # init must be > 0
+        
         self.home_buy_put = None  # Time started searching to buy a new home
         self.home_buy_get = None  # Time bought a new home
         self.home_rent_put = None  # Time started searching to rent a new home
@@ -176,8 +95,15 @@ class Household(Entity):
                                 # None if never received.
         self.prior_residences = [] # An empty list to rsecord each residence that
                                     # the entity vacates.
+                
+        self.writeAttributes() 
+        
+        self.writeResides()   
+        
+    def story_to_text(self):
+        """Join list of story strings into a single story string."""
+        return ''.join(self.story)
 
-        self.writeResides()
                             
     def buy_home(self, search_stock, duration, down_payment_pct = 0.10, housing_ratio = 0.3,
                         price_pct = 1.1, area_pct = 0.9, rooms_tol = 0,
@@ -481,12 +407,18 @@ class Household(Entity):
         else:
             pass
     
+    def writeAttributes(self):
+        if self.write_story:
+            self.story.append('{0} has ${1} of savings and a credit score of {2}. '.format(
+                                self.name, self.savings, self.credit)
+                            )
+        
     def writeResides(self):
         if self.write_story:
             self.story.append('{0} resides at {1}. '.format(
                                                 self.name, self.residence.address)
                             )
-    
+        
     def writeStartHomeBuySearch(self):    
         if self.write_story:
             self.story.append(
@@ -540,19 +472,84 @@ class Household(Entity):
                             self.name.title(), self.residence.occupancy.lower(), self.occupy_get)
                             )      
 
-class OwnerHousehold(Owner, Household):
-    """The OwnerHousehold() class has attributes of both entities.Owner() and
-    entities.Household() classes. It can own property and has a residence, which
-    do not have to be the same. The OwnerHousehold() class includes methods to
-    look for a new home to purchase (property), as well as to occupy a residence
-    (not necessarily it's property). Also includes methods to write stories.
+class Owner:
+    """The OwnerHousehold() class has attributes that allow assistance for property. 
 
     Methods:
-    find_home(self, search_patience, building_stock)
-    occupy(self, duration, callbacks = None)
-    changeListing(self, listed):
-    writeInitiateOwnerHousehold(self): 
-    writeHomeBuy(self): 
+    None
+    """
+    def __init__(self, env, name = None, income = float('inf'), savings = float('inf'), 
+                insurance = 1.0, credit = 850, real_property = None, write_story = False):
+        """Define entity inputs and outputs attributes.
+
+        Keyword Arguments:
+        env -- Pointer to SimPy env environment.
+        name -- A string indicating the entities name.
+        income -- Monthly amount earned by household in $
+        savings -- Amount of entity savings in $ 
+        insurance -- Hazard-specific insurance coverage: coverage / residence.value
+        credit -- A FICO-like credit score
+        real_property -- A building object, such as structures.SingleFamilyResidential()
+        write_story -- Boolean indicating whether to track an entity's story.
+        
+        Returns or Attribute Changes:
+        None
+        
+        """
+        # Attributes
+        self.env = env
+        self.name = name
+        self.income = name
+        self.savings = savings
+        self.credit = credit
+        self.insurance = insurance  # Hazard-specific property insurance coverage: coverage / residence.value
+        self.property = real_property # A building object from desaster.structures
+        self.write_story = write_story
+        
+        # Entity outputs
+        try:
+            if not self.story:  # Check to see if a story has already been started
+                self.story = [] # Initiate a list to contain the entity's story
+        except AttributeError:
+            self.story = []
+            
+        try:
+            self.recovery_funds = Container(env, init=self.savings)  # Total funds available to entity to recover; must be > 0
+        except:
+            self.recovery_funds = Container(env, init=1)  # init must be > 0
+        
+        self.inspection_put = None  # Time put request in for house inspection
+        self.inspection_get = None  # Time get  house inspection
+        self.claim_put = None  # Time put request in for insurance settlement
+        self.claim_get = None  # Time get insurance claim settled
+        self.claim_amount = 0.0  # Amount of insurance claim payout
+        self.fema_put = None  # Time put request in for FEMA assistance
+        self.fema_get = None  # Time get FEMA assistance
+        self.fema_amount = 0.0  # Amount of assistance provided by FEMA
+        self.sba_put = None  # Time put request for loan
+        self.sba_get = None  # Time get requested loan
+        self.sba_amount = 0.0  # Amount of loan received
+        self.assistance_payout = 0.0  # Amount of generic assistance provided (e.g., Red Cross)
+        self.repair_put = None  # Time put request in for house repair
+        self.repair_get = None  # Time get house repair completed
+        self.demolition_put = None # Time demolition requested
+        self.demolition_get = None  # Time demolition occurs
+        self.permit_put = None  # Time put request for building permit
+        self.permit_get = None  # Time get requested building permit
+        self.assessment_put = None  # Time put request for engineering assessment
+        self.assessment_get = None  # Time put request for engineering assessment
+        self.gave_up_funding_search = None  # Time entity gave up on some funding
+                                            # process; obviously can't keep track
+                                            # of multiple give ups
+        self.prior_properties = [] # A list to keep track of entity's previous properties
+        
+
+class OwnerHousehold(Household):
+    """The OwnerHousehold() class has attributes of entities.Household() and entities.Owner()
+    classes. It can own property and has a residence, which do not have to be the same. 
+
+    Methods:
+    writeOwnsOccupies(self):
     """
     def __init__(self, env, name = None, income = float('inf'), savings = float('inf'), 
                 insurance = 1.0, credit = 850, real_property = None, write_story = False):
@@ -562,12 +559,11 @@ class OwnerHousehold(Owner, Household):
         Keyword Arguments:
         env -- Pointer to SimPy env environment.
         name -- A string indicating the entities name.
+        income -- Monthly amount earned by household in $
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
         real_property -- A building object, such as structures.SingleFamilyResidential()
-        residence -- A building object, such as structures.SingleFamilyResidential()
-                    that serves as the entity's temporary or permanent residence.
         write_story -- Boolean indicating whether to track an entity's story.
         
         Returns or Attribute Changes:
@@ -577,48 +573,47 @@ class OwnerHousehold(Owner, Household):
         entities.Household()
         entities.Owner()
         """
-        Owner.__init__(self, env, name, savings, insurance, credit, real_property, write_story)
-        Household.__init__(self, env, name, income, savings, credit, self.property, write_story)
-
-        self.writeInitiateOwnerHousehold()
-
-    def writeInitiateOwnerHousehold(self):    
+    
+        # Inherit from Owner() and Household() classes
+        Owner.__init__(self, env, name, income, savings, insurance, credit, real_property, write_story)
+        Household.__init__(self, env, name, income, savings, credit, real_property, write_story)
+    
+        self.writeOwnsOccupies()
+        
+    def writeOwnsOccupies(self):  
         if self.write_story:
             # Set story with non-disaster attributes.
             self.story.append(
-            '{0} owns and lives in a {1} room {2} at {3} worth ${4:,.0f}. '.format(self.name,
-            self.residence.bedrooms, self.residence.occupancy.lower(), self.residence.address,
-            self.residence.value)
+                '{0} owns and occupies a {1} bedroom {2} worth ${3:,.0f}. '.format(self.name,
+                self.property.bedrooms, self.property.occupancy.lower(),
+                self.property.value)
                                 )
-                
+                                
 class RenterHousehold(Household):
-    """The RenterHousehold() class has attributes of both entities.Entity() and
-    entities.Household() classes. The class does not have associated property, but
-    does have an associated landlord (entities.Landlord() object) that owns their 
+    """The RenterHousehold() class has attributes of entities.Household() extended
+    so can be associated with a landlord (entities.Landlord() object) that owns their 
     residence. So RenterHousehold() objects can have both residences and landlords 
     assigned and unassigned to represent, e.g., evictions.
 
     Methods:
-    find_home(self, search_patience, building_stock)
-    occupy(self, duration, callbacks = None)
-    changeListing(self, listed):
-    writeInitiateRenterHousehold(self): 
-    writeHomeRent(self):  
+    writeRents(self)  
     """
-    def __init__(self, env, name = None, income = float('inf'), savings = float('inf'), insurance = 1.0, credit = 850, 
-                    residence = None, landlord = None, write_story = False):
+    def __init__(self, env, name = None, income = float('inf'), savings = float('inf'), 
+                    insurance = 1.0, credit = 850, residence = None, landlord = None, 
+                    story = [], write_story = False):
         """Define entity inputs and outputs attributes.
         Initiate entity's story list string.
 
         Keyword Arguments:
         env -- Pointer to SimPy env environment.
         name -- A string indicating the entities name.
+        income -- Monthly amount of household earnings in $
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
         residence -- A building object, such as structures.SingleFamilyResidential()
                     that serves as the entity's temporary or permanent residence.
-        landlord -- An Owner object that represent's the renter's landlord.
+        landlord -- An OwnerHousehold object that represent's the renter's landlord.
         write_story -- Boolean indicating whether to track an entity's story.
         
         Returns or Attribute Changes:
@@ -634,34 +629,34 @@ class RenterHousehold(Household):
         # Initial method calls; This needs to go after landlord assignment.
         Household.__init__(self, env, name, income, savings, credit, residence, write_story)
 
-        self.writeInitiateRenterHousehold()
+        self.writeRents()
             
-    def writeInitiateRenterHousehold(self):    
+    def writeRents(self):    
         if self.write_story:
             self.story.append(
-            '{0} rents and lives in a {1} room {2} at {3}. '.format(
+            '{0} rents a {1} room {2} owned by {3}. '.format(
             self.name, self.residence.bedrooms, self.residence.occupancy.lower(),
-            self.residence.address)
+            self.landlord.name)
                             )                                                   
                 
-class Landlord(Owner):
-    """A Landlord() class is a subclass of entiites.Owner() but has an attributes
-    that allows it to have a tenant (e.g., entities.RenterHousehold). Otherwise,
-    similar to entities.Owner().
+class Landlord(OwnerHousehold):
+    """A Landlord() class is an extension of entiites.Owner() but has an attributes
+    that allows it to have a tenant (e.g., entities.RenterHousehold).
     
     Methods:
     evict_tenant(self):
-    writeInitiateLandlord(self):
+    writeLandlord(self)
     writeEvicted(self):
     """
-    def __init__(self, env, name = None, savings = 0, insurance = 0, credit = 0, real_property = None, 
+    def __init__(self, env, name = None, income = float('inf'), savings = 0, 
+                insurance = 0, credit = 0, real_property = None, 
                 tenant = None, write_story = False):
         """Define landlord's inputs and outputs attributes.
-        Initiate landlord's story list string.
 
         Keyword Arguments:
         env -- Pointer to SimPy env environment.
         name -- A string indicating the entities name.
+        income -- Monthly amount of landlord earnings in $
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
@@ -674,29 +669,30 @@ class Landlord(Owner):
         self.story -- Initiate landlord's story 
         
         Inheritance:
-        Subclass of entities.Owner()
+        Subclass of entities.OwnerHousehold()
         """
-        Owner.__init__(self, env, name, savings, insurance, credit, real_property, write_story)
-
+        Owner.__init__(self, env, name, income, savings, insurance, credit, 
+                                real_property, write_story)
+                                
         # Landlord env inputs
         self.tenant = tenant
-
-        self.writeInitiateLandlord()
         
+        self.writeLandlord()
+
     def evict_tenant(self):
         self.tenant.prior_residences.append(self.tenant.residence)
         self.tenant.residence = None
         
         self.writeEvicted()
         
-    def writeInitiateLandlord(self):
-        if self.write_story:
-            # Set story with non-disaster attributes.
+    def writeLandlord(self):  
+        if self.write_story == True:
             self.story.append(
-                '{0} rents out a {1} bedroom {2} at {3} worth ${4:,.0f}. '.format(
+                '{0} is owner and landlord of a {1} bedroom {2} worth ${3:,.0f}. '.format(
                 self.name, self.property.bedrooms, self.property.occupancy.lower(),
-                self.property.address, self.property.value)
-                                )  
+                self.property.value)
+                                )
+    
     def writeEvicted(self):
         if self.tenant.write_story == True:
             self.tenant.story.append(
@@ -705,4 +701,3 @@ class Landlord(Owner):
                                             self.property.damage_state.lower()
                                                                                     )
                                         )  
-

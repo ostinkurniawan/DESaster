@@ -15,8 +15,6 @@ RepairVacantBuilding
 """
 import random
 random.seed(15)
-from desaster.entities import Owner
-
 
 class FinancialRecoveryPolicy(object):
     """Base class for creating financial recovery policies. Serves to make
