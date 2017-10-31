@@ -33,7 +33,6 @@ class Household:
     buy_home(self, search_patience, building_stock)
     rent_home(self, search_patience, building_stock)
     occupy(self, duration, callbacks = None)
-    changeListing(self, listed)
     writeAttributes(self)
     writeOccupy(self): 
     writeResides()
@@ -215,11 +214,12 @@ class Household:
         # listed attributed to True -- put home up for sale.
         # get and put from FilterStore to tell SimPy object's state changed
         if self.property:
-            self.changeListing(listed = True)
+            get_home = yield self.property.stock.get(lambda getHome:
+                                                        getHome.__dict__ == self.property.__dict__
+                                                )
+            self.property.listed = True
+            yield self.property.stock.put(get_home)
         
-        # Take new home off the market and place back in housing stock
-        # (in orde for SimPy to register the resource state change)
-        self.changeListing(listed = False)
         
         # Take a timeout equal to specified time to close home purchase
         yield self.env.timeout(duration.rvs())
@@ -229,6 +229,14 @@ class Household:
 
         # Make the entity's property also their residence
         self.residence = self.property
+        
+        # Take new home off the market and place back in housing stock
+        # (in orde for SimPy to register the resource state change)
+        get_home = yield self.property.stock.get(lambda getHome:
+                                                    getHome.__dict__ == self.property.__dict__
+                                            )
+        self.property.listed = False
+        yield self.property.stock.put(get_home)
         
         # Record the time that the housing search ends.
         self.home_buy_get = self.env.now
@@ -292,8 +300,10 @@ class Household:
 
         self.writeStartHomeRentSearch()
         
+        # self.residence = self.prior_residences[0]
         # Define a FilterStore.get process to find a new home to rent from the vacant
         # for rent stock with similar attributes as original residence.
+        
         new_home = search_stock.get(lambda findHome:
                         findHome.damage_state == 'None'
                         and findHome.occupancy.lower() == self.prior_residences[0].occupancy.lower()
@@ -303,18 +313,23 @@ class Household:
                         and findHome.listed == True
                                     )
         
+        # new_home = self.prior_residences[0].stock.get(lambda getHome:
+        #                                             getHome.__dict__ == self.prior_residences[0].__dict__
+        #                                     )
+        
+
         # Yield both the patience timeout and the housing stock FilterStore get.
         # Wait until one or the other process is completed.
         # Assign the process that is completed first to the variable.
         home_search_outcome = yield find_search_patience | new_home
-
+        
         # Exit the function if the patience timeout completes before a suitable
         # home is found in the housing stock.
         if home_search_outcome == {find_search_patience: 'Gave up'}:
             self.gave_up_home_rent_search = self.env.now
             # If write_story, note in the story that the entity gave up
             # the search.
-            self.writeGaveUpHomeRentSearch()
+            self.writeGaveUpHomeRentSearchStock()
             if self.residence:
                 del self.prior_residences[0] # Didn't replace home, so delete from prior
             return
@@ -338,7 +353,7 @@ class Household:
             yield search_stock.put(home_search_outcome[new_home]) # Didn't buy it afterall
             # Put current residence as a prior residence
             self.gave_up_home_rent_search = self.env.now
-            self.writeGaveUpHomeRentSearch()
+            self.writeGaveUpHomeRentSearchMoney()
             if self.residence:
                 del self.prior_residences[0] # Didn't replace home, so delete from prior
             return
@@ -347,31 +362,29 @@ class Household:
         # listed state to True to indicate residence is for rent (if tenant has a 
         # residence). But do only if this is a permanent move (permanent == True)
         if self.residence:
-            if permanent == True:
-                self.changeListing(listed = True)
-
-        # Set the newly found home as the entity's residence.
-        self.changeListing(listed = False)
-        
+            get_home = yield self.residence.stock.get(lambda getHome:
+                                                        getHome.__dict__ == self.residence.__dict__
+                                                )
+            self.residence.listed = True
+            yield self.residence.stock.put(get_home)
+        # 
         # Take a timeout equal to specified to notice time before can move in
         yield self.env.timeout(duration.rvs())
-        
+        # 
         # Set newly found home as residence
         self.residence = home_search_outcome[new_home]
-
+        
+        # # Change listing of the new residence
+        self.residence.listed = False
+        yield self.residence.stock.put(home_search_outcome[new_home])
+        # 
         # Record the time that the housing search ends.
         self.home_rent_get = self.env.now
-
+        
         # If write_story is True, then write results of successful home search to
         # entity's story.
         self.writeHomeRent()
             
-    def changeListing(self, listed):
-        get_home = yield self.residence.stock.get(lambda getHome:
-                                                    getHome.__dict__ == self.residence.__dict__
-                                            )
-        self.residence.listed = listed
-        yield self.residence.stock.put(get_home)
     
     def occupy(self, duration, callbacks = None):
         """Define process for occupying a residence--e.g., amount of time it takes
@@ -395,7 +408,7 @@ class Household:
 
         # Yield timeout equivalent to time required to move back into home.
         yield self.env.timeout(duration.rvs())
-
+        
         # Record time got home
         self.occupy_get = self.env.now
 
@@ -441,14 +454,21 @@ class Household:
                             self.prior_residences[0].occupancy.lower())
                 ) 
     
-    def writeGaveUpHomeRentSearch(self):
+    def writeGaveUpHomeRentSearchStock(self):
         if self.write_story:
             self.story.append(
-                'On day {0:,.0f}, after a {1:,.0f} day search, {2} gave up looking for a {3} rental in the local area. '.format(
+                'On day {0:,.0f}, after a {1:,.0f} day search, {2} could not find a {3} rental in the local area. '.format(
                             self.env.now, self.env.now - self.home_rent_put, self.name.title(),
                             self.prior_residences[0].occupancy.lower())
                 )  
-                            
+    def writeGaveUpHomeRentSearchMoney(self):
+        if self.write_story:
+            self.story.append(
+                'On day {0:,.0f}, after a {1:,.0f} day search, {2} was unable to pay for move-in costs for a {3} rental in the local area and gave up looking. '.format(
+                            self.env.now, self.env.now - self.home_rent_put, self.name.title(),
+                            self.prior_residences[0].occupancy.lower())
+                )                          
+    
     def writeHomeBuy(self):    
         if self.write_story:
             self.story.append(
@@ -465,7 +485,7 @@ class Household:
                 self.residence.address, self.residence.monthly_cost, self.residence.damage_value)
                 ) 
     
-    def writeOccupy(self):            
+    def writeOccupy(self):          
         if self.write_story:
             self.story.append(
                             "{0} occupied the {1} {2:.0f} days after the event. ".format(
@@ -473,7 +493,7 @@ class Household:
                             )      
 
 class Owner:
-    """The OwnerHousehold() class has attributes that allow assistance for property. 
+    """The Owner() class has attributes that allow assistance for property. 
 
     Methods:
     None
@@ -625,6 +645,7 @@ class RenterHousehold(Household):
         """
         # Attributes
         self.landlord = landlord
+        self.evict_get = None # Time that renter gets evicted (if evicted)
 
         # Initial method calls; This needs to go after landlord assignment.
         Household.__init__(self, env, name, income, savings, credit, residence, write_story)
@@ -639,7 +660,7 @@ class RenterHousehold(Household):
             self.landlord.name)
                             )                                                   
                 
-class Landlord(OwnerHousehold):
+class Landlord(Owner):
     """A Landlord() class is an extension of entiites.Owner() but has an attributes
     that allows it to have a tenant (e.g., entities.RenterHousehold).
     
@@ -683,8 +704,19 @@ class Landlord(OwnerHousehold):
         self.tenant.prior_residences.append(self.tenant.residence)
         self.tenant.residence = None
         
+        get_property = yield self.property.stock.get(lambda getHome:
+                                                    getHome.__dict__ == self.property.__dict__
+                                            )
+    
+        self.property.listed = True
+        yield self.property.stock.put(get_property)
+        
         self.writeEvicted()
         
+        self.tenant.evict_get = self.env.now
+        self.tenant = None
+        
+
     def writeLandlord(self):  
         if self.write_story == True:
             self.story.append(
