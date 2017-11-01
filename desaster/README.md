@@ -1,8 +1,5 @@
+<<<<<<< HEAD
 # UNFORTUNATELY THIS IS WELL OUT OF DATE. BUT IT GIVES THE GIST
-
-=======
->>>>>>> parent of 2751fc5... Merge branch 'master' into ScottsDevBranch
-**Dependencies**
 
 Read modules to see all import dependencies. Easiest thing to do is to install Anaconda and then install simpy.
 
