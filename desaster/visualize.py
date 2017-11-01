@@ -105,6 +105,7 @@ def dashboard(df, sim_time = 180, lat = 43.223628, lon = -90.294633,
     barplot = figure(plot_width=800, plot_height=600, tools='pan, wheel_zoom, reset, save',
                   x_axis_label='Status', x_range=source.data['x'],
                   y_range=ranges.Range1d(start=0, end=len(data['y'])),
+                  title="Number of Households by Status at Specified Time (Slider)")
     barplot.vbar(source=source, x='x', top='y', color='colors', width=0.6)
     bar_hover = HoverTool(tooltips=[('num','@y')])
     barplot.add_tools(bar_hover)
@@ -114,6 +115,7 @@ def dashboard(df, sim_time = 180, lat = 43.223628, lon = -90.294633,
     #Map Setup
     map_options = GMapOptions(lat = lat, lng = lon, scale_control = True, map_type = "roadmap", zoom = 16)
     mapplot = GMapPlot(x_range=DataRange1d(), y_range=DataRange1d(), map_options=map_options)
+    mapplot.title.text = "Locations of Modeled Homes (Marker Size Proportional to Original Damage State; Colors Defined Below)"
 
     # Set up tool tip with household stories
     hover = HoverTool()
@@ -162,6 +164,7 @@ def dashboard(df, sim_time = 180, lat = 43.223628, lon = -90.294633,
     """)
 
     #Line Graph setup
+    line_plot = figure(title='Number of Households By Status vs. Simulated Time',
                        y_range=ranges.Range1d(start=int(NUM_HOMES*0.1), end=int(NUM_HOMES*1.5)),
                        tools='pan, wheel_zoom, reset, save')
     all_line_data = status_count_df.values.tolist()
