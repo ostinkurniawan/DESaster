@@ -149,7 +149,8 @@ class Household:
 
         # Record current residence as prior residence, current property as
         # prior property
-        self.prior_properties.append(self.property)
+        if self.property:
+            self.prior_properties.append(self.property)
         if self.residence:
             self.prior_residences.append(self.residence)
         
@@ -214,29 +215,40 @@ class Household:
         # listed attributed to True -- put home up for sale.
         # get and put from FilterStore to tell SimPy object's state changed
         if self.property:
-            get_home = yield self.property.stock.get(lambda getHome:
+            prior_property = yield self.property.stock.get(lambda getHome:
                                                         getHome.__dict__ == self.property.__dict__
                                                 )
-            self.property.listed = True
-            yield self.property.stock.put(get_home)
+            prior_property.listed = True
+            yield self.property.stock.put(prior_property)
         
+        # 
+        if self.residence and self.residence != self.property:
+            prior_residence = yield self.residence.stock.get(lambda getHome:
+                                                        getHome.__dict__ == self.residence.__dict__
+                                                )
+            prior_residence.listed = True
+            prior_residence.owner.tenant = None
+            yield self.residence.stock.put(prior_residence)
         
         # Take a timeout equal to specified time to close home purchase
         yield self.env.timeout(duration.rvs())
+    
+        # Add to their story that they vacated their prior residence
+        self.writeVacated()
         
         # Set the newly found home as the entity's property.
+        # Remove previous owner. Set new owner.
         self.property = home_search_outcome[new_home]
+        self.property.owner.property = None
+        self.property.owner = self
 
-        # Make the entity's property also their residence
-        self.residence = self.property
-        
         # Take new home off the market and place back in housing stock
         # (in orde for SimPy to register the resource state change)
-        get_home = yield self.property.stock.get(lambda getHome:
-                                                    getHome.__dict__ == self.property.__dict__
-                                            )
         self.property.listed = False
-        yield self.property.stock.put(get_home)
+        yield self.property.stock.put(self.property)
+        
+        # Make the entity's property also their residence
+        self.residence = self.property
         
         # Record the time that the housing search ends.
         self.home_buy_get = self.env.now
@@ -313,10 +325,6 @@ class Household:
                         and findHome.listed == True
                                     )
         
-        # new_home = self.prior_residences[0].stock.get(lambda getHome:
-        #                                             getHome.__dict__ == self.prior_residences[0].__dict__
-        #                                     )
-        
 
         # Yield both the patience timeout and the housing stock FilterStore get.
         # Wait until one or the other process is completed.
@@ -361,18 +369,28 @@ class Household:
         # If a new home is found before patience runs change current residence's 
         # listed state to True to indicate residence is for rent (if tenant has a 
         # residence). But do only if this is a permanent move (permanent == True)
-        if self.residence:
-            get_home = yield self.residence.stock.get(lambda getHome:
+        if self.residence and permanent == True:
+            prior_residence = yield self.residence.stock.get(lambda getHome:
                                                         getHome.__dict__ == self.residence.__dict__
                                                 )
-            self.residence.listed = True
-            yield self.residence.stock.put(get_home)
+            prior_residence.listed = True
+            yield self.residence.stock.put(prior_residence)
         # 
         # Take a timeout equal to specified to notice time before can move in
         yield self.env.timeout(duration.rvs())
-        # 
-        # Set newly found home as residence
+        
+        # Add to their story that they vacated their prior residence
+        self.writeVacated()
+        
+        # Set newly found home as residence; set new landlord
         self.residence = home_search_outcome[new_home]
+        self.landlord = self.residence.owner
+        
+        # Make sure there is no tenant in a rental being occupied before setting new tenant
+        # (e.g., if a dummy tenant is being use to create a vacant rental stock)
+        if self.landlord.tenant.residence != None:
+            self.landlord.tenant.residence = None
+        self.landlord.tenant = self
         
         # # Change listing of the new residence
         self.residence.listed = False
@@ -383,11 +401,12 @@ class Household:
         
         # If write_story is True, then write results of successful home search to
         # entity's story.
+        
         self.writeHomeRent()
             
     
-    def occupy(self, duration, callbacks = None):
-        """Define process for occupying a residence--e.g., amount of time it takes
+    def occupy_permanent(self, duration, callbacks = None):
+        """Define process for PERMANENTLY occupying a residence--e.g., amount of time it takes
         to move into a new residence. Currently the method doesn't do much but
         make story writing simpler.
 
@@ -409,6 +428,23 @@ class Household:
         # Yield timeout equivalent to time required to move back into home.
         yield self.env.timeout(duration.rvs())
         
+        # Check to see if the household owns property (i.e., is an owner). If so...
+        # If property and residence are not the same, assume any prior residence was
+        # temporary. Change status of temporary residence to listed and vacant. 
+        # Then make their property their residence.
+        if hasattr(self, 'property') and self.residence != self.property:
+            prior_residence = yield self.residence.stock.get(lambda getHome:
+                                                        getHome.__dict__ == self.residence.__dict__
+                                                )
+            prior_residence.listed = True
+            prior_residence.owner.tenant = None
+            yield self.residence.stock.put(prior_residence)
+            
+            # Add to their story that they left the residence to occupy their property
+            self.writeVacated()
+            
+            self.residence = self.property      
+            
         # Record time got home
         self.occupy_get = self.env.now
 
@@ -431,7 +467,7 @@ class Household:
             self.story.append('{0} resides at {1}. '.format(
                                                 self.name, self.residence.address)
                             )
-        
+    
     def writeStartHomeBuySearch(self):    
         if self.write_story:
             self.story.append(
@@ -473,24 +509,34 @@ class Household:
         if self.write_story:
             self.story.append(
                 'On day {0:,.0f}, {1} purchased a {2} at {3} with a value of ${4:,.0f}. '.format(
-                self.home_buy_get, self.name.title(), self.property.occupancy.lower(), self.property.address,
-                self.property.value)
+                self.home_buy_get, self.name.title(), self.property.occupancy.lower(), 
+                self.property.address, self.property.value)
                             )
                         
     def writeHomeRent(self):      
         if self.write_story:
             self.story.append(
-                'On day {0:,.0f}, {1} rented a {2} at {3} with a rent of ${4:,.0f}. '.format(
+                'On day {0:,.0f}, {1} rented a {2} owned by {3} at {4} with a rent of ${5:,.0f}. '.format(
                 self.home_rent_get, self.name.title(), self.residence.occupancy.lower(),
-                self.residence.address, self.residence.monthly_cost, self.residence.damage_value)
+                self.landlord.name, self.residence.address, self.residence.monthly_cost, 
+                self.residence.damage_value)
                 ) 
     
     def writeOccupy(self):          
         if self.write_story:
             self.story.append(
-                            "{0} occupied the {1} {2:.0f} days after the event. ".format(
-                            self.name.title(), self.residence.occupancy.lower(), self.occupy_get)
-                            )      
+                            "{0} moved into the {1} {2} at {3} {4:.0f} days after the event. ".format(
+                            self.name.title(), self.residence.tenure.lower(),
+                            self.residence.occupancy.lower(), self.residence.address,
+                            self.occupy_get)
+                            )  
+                        
+    def writeVacated(self):
+        if self.write_story:
+            self.story.append('{0} vacated the {1} {2} at {3}. '.format(
+                                self.name, self.residence.tenure.lower(),
+                                self.residence.occupancy.lower(), self.residence.address)
+            )    
 
 class Owner:
     """The Owner() class has attributes that allow assistance for property. 
