@@ -172,8 +172,7 @@ class HousingAssistanceFEMA(FinancialRecoveryProgram):
             # Calculate assistance request.
             # Must subtract any insurance payout from FEMA payout and choose the lesser of
             # max assistance and deducted total
-            entity.fema_amount = min(self.max_outlay, (entity.property.damage_value
-                                        - entity.claim_amount))
+            entity.fema_amount = self.setAmount(entity)
 
             #Ensure that entity does not have enough money already.
             if entity.fema_amount <= 0.0:
@@ -204,8 +203,7 @@ class HousingAssistanceFEMA(FinancialRecoveryProgram):
             self.staff.release(request)
 
             # Update assistance request in case of funding from parallel insurance process
-            entity.fema_amount = min(self.max_outlay, (entity.property.damage_value
-                                        - entity.claim_amount))
+            entity.fema_amount = self.setAmount(entity)
 
             if entity.fema_amount <= 0:
                 self.writeWithdraw(entity, 'FEMA')
@@ -216,7 +214,7 @@ class HousingAssistanceFEMA(FinancialRecoveryProgram):
             yield self.budget.get(entity.fema_amount)
             
             yield entity.recovery_funds.put(entity.fema_amount)
-
+                
             # Record time received FEMA assistance.
             entity.fema_get = self.env.now
             
@@ -233,6 +231,17 @@ class HousingAssistanceFEMA(FinancialRecoveryProgram):
         else:
             pass
 
+    def setAmount(self, entity):
+        
+        # Check to see if the entity has a prior property. If it does, ensure 
+        # that calculations are done using their original property
+        if entity.prior_properties:
+            return min(self.max_outlay, (entity.prior_properties[0].damage_value_start
+                                    - entity.claim_amount))
+        else:
+            return min(self.max_outlay, (entity.property.damage_value_start
+                                    - entity.claim_amount))
+                                                                    
     def writeDeadline(self, entity):
         if entity.write_story:
             entity.story.append(
@@ -326,13 +335,23 @@ class OwnersInsurance(FinancialRecoveryProgram):
 
                 # The insurance deductible amount is the home value multiplied by the
                 # coverage ratio multipled by the deductible percentage.
-                deductible_amount = entity.property.value * entity.insurance * self.deductible
+                # Ensure calculations are done using attributes of the original property
+                if entity.prior_properties:
+                    deductible_amount = entity.prior_properties[0].value * entity.insurance * self.deductible
+                else:
+                    deductible_amount = entity.property.value * entity.insurance * self.deductible
 
                 # Determine payout amount and add to entity's repair money.
                 # Only payout amount equal to the damage, not the full coverage.
-                if entity.property.damage_value < deductible_amount:
-                    self.writeDeductible(entity)
-                    return
+                # Ensure calculations are done using attributes of the original property
+                if entity.prior_properties:
+                    if entity.prior_properties[0].damage_value_start < deductible_amount:
+                        self.writeDeductible(entity)
+                        return
+                else:
+                    if entity.property.damage_value_start < deductible_amount:
+                        self.writeDeductible(entity)
+                        return
 
                 # If damage > deductible, submit request for insurance adjusters.
                 request = self.staff.request()
@@ -343,8 +362,13 @@ class OwnersInsurance(FinancialRecoveryProgram):
 
                 # Release insurance adjusters so they can process other claims.
                 self.staff.release(request)
-
-                entity.claim_amount = entity.property.damage_value - deductible_amount
+                
+                # Calculate claim amount
+                # Ensure calculation done using original property
+                if entity.prior_properties:
+                    entity.claim_amount = entity.prior_properties[0].damage_value_start - deductible_amount
+                else:
+                    entity.claim_amount = entity.property.damage_value_start - deductible_amount
 
                 # Make request for the claim amount from the insurance budget
                 # If get request, add to entity money to repair
@@ -402,7 +426,7 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
     Methods:
     __init__
     process(self, entity, callbacks = None):
-    setLoanAmount(self, entity):
+    setAmount(self, entity):
     writeDeadline(self, entity):
     writeApplied(self, entity):
     writeDeniedCredit(self, entity):
@@ -473,12 +497,11 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
             # Check to see declaration has occurred; if not, wait
             if self.env.now < self.declaration:
                 yield self.env.timeout(self.declaration - self.env.now)
-            
             # Record time application submitted.
             entity.sba_put = self.env.now
 
             # Call function to set entity.sba_amount
-            entity.sba_amount = self.setLoanAmount(entity)
+            entity.sba_amount = self.setAmount(entity)
             
             # Ensure entity does not have enough funds.
             if entity.sba_amount <= 0:
@@ -512,10 +535,10 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
             yield inspector_request
             yield self.env.timeout(1) # Assumed 1 day inspection duration.
             self.inspectors.release(inspector_request)
-
-            # Update loan amount (in case other processes in parallel)
-            entity.sba_amount = self.setLoanAmount(entity)
             
+            # Update loan amount (in case other processes in parallel)
+            entity.sba_amount = self.setAmount(entity)
+
             self.writeInspected(entity)
 
             if entity.sba_amount <= 0:
@@ -528,7 +551,7 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
                 # Receives $25k immediately as initial disbursement
                 yield self.budget.get(25000)
                 yield entity.recovery_funds.put(25000)
-                
+
                 self.writeFirstDisbursement(entity)
                 
                 #
@@ -539,7 +562,7 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
                 yield self.env.timeout(self.duration.rvs())
 
                 # Update loan amount (in case other processes in parallel)
-                entity.sba_amount = self.setLoanAmount(entity)
+                entity.sba_amount = self.setAmount(entity)
 
                 if entity.sba_amount <= 0:
                     self.writeWithdraw(entity, 'SBA')
@@ -547,7 +570,7 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
 
                 yield self.budget.get(entity.sba_amount - 25000)
                 yield entity.recovery_funds.put(entity.sba_amount - 25000)
-
+            
                 self.writeSecondDisbursement(entity)
 
             else:
@@ -569,8 +592,14 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
         else:
             pass
 
-    def setLoanAmount(self, entity):
-        required_loan = max(0, entity.property.damage_value - entity.claim_amount - entity.fema_amount)
+    def setAmount(self, entity):
+        # Check to see if the entity has a prior property. If it does, ensure 
+        # that calculations are done using their original property
+    
+        if entity.prior_properties:
+            required_loan = max(0, entity.prior_properties[0].damage_value_start - entity.claim_amount - entity.fema_amount)
+        else:    
+            required_loan = max(0, entity.property.damage_value_start - entity.claim_amount - entity.fema_amount)
         
         # Just in case entity doesn't have income attribute (e.g., landlord)
         try:
@@ -579,7 +608,7 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
             qualified_loan = -1.0 * np.pv(monthly_rate, self.loan_term * 12, qualified_monthly_payment)
         except AttributeError:
             qualified_loan = required_loan * 0.44 # Result of regression analysis of past SBA loans
-        
+
         return min(required_loan, qualified_loan, self.max_loan)
     
     def writeDeadline(self, entity):
@@ -592,7 +621,10 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
     def writeApplied(self, entity):
         if entity.write_story:
             
-            required_loan = max(0, entity.property.damage_value - entity.claim_amount - entity.fema_amount)
+            if entity.prior_properties:
+                required_loan = max(0, entity.prior_properties[0].damage_value_start - entity.claim_amount - entity.fema_amount)
+            else:
+                required_loan = max(0, entity.property.damage_value_start - entity.claim_amount - entity.fema_amount)
             applied_loan = min(required_loan, self.max_loan)
             
             entity.story.append(

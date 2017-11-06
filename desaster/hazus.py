@@ -65,9 +65,9 @@ def setStructuralDamageValueHAZUS(building):
     acceleration_damage_ratios -- HAZUS damage lookup table (see above)
     drift_damage_ratios -- HAZUS damage lookup table (see above)
     """
-    struct_repair_ratio = structural_damage_ratios.ix[building.occupancy][building.damage_state] / 100.0
-    accel_repair_ratio = acceleration_damage_ratios.ix[building.occupancy][building.damage_state] / 100.0
-    drift_repair_ratio = drift_damage_ratios.ix[building.occupancy][building.damage_state] / 100.0
+    struct_repair_ratio = structural_damage_ratios.loc[building.occupancy][building.damage_state] / 100.0
+    accel_repair_ratio = acceleration_damage_ratios.loc[building.occupancy][building.damage_state] / 100.0
+    drift_repair_ratio = drift_damage_ratios.loc[building.occupancy][building.damage_state] / 100.0
     
     building.damage_value = building.value * (struct_repair_ratio + accel_repair_ratio + drift_repair_ratio)
     

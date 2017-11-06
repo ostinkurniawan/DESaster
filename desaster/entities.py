@@ -255,11 +255,12 @@ class Household:
 
         # If write_story is True, then write results of successful home search to
         # entity's story.
-        self.writeHomeBuy()
+        self.writeHomeBuy(down_payment)
 
-    def rent_home(self, search_stock, duration, move_in_ratio = 2.5, housing_ratio = 0.3,
-                area_pct = 0.9, rooms_tol = 0, notice_time = 20.0,
-                search_patience = float('inf'), permanent = True):
+    def rent_home(self, search_stock, duration, occupancy = 'single family dwelling',
+                    move_in_ratio = 2.5, housing_ratio = 0.3, area_pct = 0.9,
+                    rooms_tol = 0, notice_time = 20.0, search_patience = float('inf'),
+                    permanent = True):
 
         """A process (generator) representing entity search for permanent housing
         based on housing preferences, available housing stock, and patience finding
@@ -309,23 +310,25 @@ class Household:
         # Return 'Gave up' if timeout process completes.
         find_search_patience = self.env.timeout(patience_end - self.env.now,
             value='Gave up')
-
+        
         self.writeStartHomeRentSearch()
         
-        # self.residence = self.prior_residences[0]
         # Define a FilterStore.get process to find a new home to rent from the vacant
         # for rent stock with similar attributes as original residence.
         
-        new_home = search_stock.get(lambda findHome:
-                        findHome.damage_state == 'None'
-                        and findHome.occupancy.lower() == self.prior_residences[0].occupancy.lower()
-                        and (findHome.bedrooms >= self.prior_residences[0].bedrooms + rooms_tol
-                        or findHome.area >= self.prior_residences[0].area * area_pct)
-                        and findHome.monthly_cost <= (self.income / 12.0) * housing_ratio
-                        and findHome.listed == True
-                                    )
+        try:
+            new_home = search_stock.get(lambda findHome:
+                            findHome.damage_state == 'None'
+                            and findHome.occupancy.lower() == occupancy.lower()
+                            and (findHome.bedrooms >= self.prior_residences[0].bedrooms + rooms_tol
+                            or findHome.area >= self.prior_residences[0].area * area_pct)
+                            and findHome.monthly_cost <= (self.income / 12.0) * housing_ratio
+                            and findHome.listed == True
+                                        )
+        except AttributeError as err:
+            print('Residence attribute not supported by Household.rent_home(): {1}'.format(err))
+            return
         
-
         # Yield both the patience timeout and the housing stock FilterStore get.
         # Wait until one or the other process is completed.
         # Assign the process that is completed first to the variable.
@@ -347,9 +350,8 @@ class Household:
         move_in_cost_patience = self.env.timeout(patience_end - self.env.now,
                                                 value='Gave up')
 
-        # Withdraw 10% down payment; wait for more funds if don't have it yet
+        # Withdraw down payment; wait for more funds if don't have it yet
         move_in_cost = move_in_ratio * home_search_outcome[new_home].monthly_cost
-        
         get_move_in_cost = self.recovery_funds.get(move_in_cost)
         
         # Yield both the remaining patience timeout and down payment get.
@@ -388,7 +390,7 @@ class Household:
         
         # Make sure there is no tenant in a rental being occupied before setting new tenant
         # (e.g., if a dummy tenant is being use to create a vacant rental stock)
-        if self.landlord.tenant.residence != None:
+        if self.landlord.tenant != None and self.landlord.tenant.residence != None:
             self.landlord.tenant.residence = None
         self.landlord.tenant = self
         
@@ -402,7 +404,7 @@ class Household:
         # If write_story is True, then write results of successful home search to
         # entity's story.
         
-        self.writeHomeRent()
+        self.writeHomeRent(move_in_cost)
             
     
     def occupy_permanent(self, duration, callbacks = None):
@@ -478,8 +480,9 @@ class Household:
     def writeStartHomeRentSearch(self):    
         if self.write_story:
             self.story.append(
-                '{0} started searching to rent a {1} {2:,.0f} days after the event. '.format(
-                self.name.title(), self.prior_residences[0].occupancy.lower(), self.home_rent_put)
+                '{0} started searching for a {1} rental {3:,.0f} days after the event. '.format(
+                self.name.title(), self.prior_residences[0].occupancy.lower(),
+                self.prior_residences[0].tenure.lower(), self.home_rent_put)
                 )
     
     def writeGaveUpHomeBuySearch(self):
@@ -504,22 +507,22 @@ class Household:
                             self.env.now, self.env.now - self.home_rent_put, self.name.title(),
                             self.prior_residences[0].occupancy.lower())
                 )                          
-    
-    def writeHomeBuy(self):    
+                            
+    def writeHomeBuy(self, down_payment):    
         if self.write_story:
             self.story.append(
-                'On day {0:,.0f}, {1} purchased a {2} at {3} with a value of ${4:,.0f}. '.format(
-                self.home_buy_get, self.name.title(), self.property.occupancy.lower(), 
-                self.property.address, self.property.value)
+                'On day {0:,.0f}, {1} purchased a ${2:,.0f} {3} at {4} with a down payment of ${5:,.0f}. '.format(
+                self.home_buy_get, self.name.title(), self.property.value, 
+                self.property.occupancy.lower(), self.property.address, down_payment)
                             )
                         
-    def writeHomeRent(self):      
+    def writeHomeRent(self, move_in_cost):      
         if self.write_story:
             self.story.append(
-                'On day {0:,.0f}, {1} rented a {2} owned by {3} at {4} with a rent of ${5:,.0f}. '.format(
+                'On day {0:,.0f}, {1} rented a {2} owned by {3} at {4} with a rent of ${5:,.0f} and move in cost of ${6:,.0f}. '.format(
                 self.home_rent_get, self.name.title(), self.residence.occupancy.lower(),
                 self.landlord.name, self.residence.address, self.residence.monthly_cost, 
-                self.residence.damage_value)
+                move_in_cost)
                 ) 
     
     def writeOccupy(self):          

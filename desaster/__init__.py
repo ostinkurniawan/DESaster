@@ -5,7 +5,7 @@ desaster package initiation file.
 @author: Scott Miles (milessb@uw.edu)
 """
 from desaster import entities, structures, hazus, financial, technical, policies, io
-from desaster.io import importEntities, importSingleFamilyResidenceStock, output_summary
+from desaster.io import importEntities, importBuildingStock, output_summary
 from desaster.hazus import setStructuralDamageValueHAZUS, setContentsDamageValueHAZUS
 from desaster.entities import Household, Owner, OwnerHousehold, RenterHousehold, Landlord
 from desaster.technical import TechnicalRecoveryProgram, RepairProgram, InspectionProgram, DemolitionProgram

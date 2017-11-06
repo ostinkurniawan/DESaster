@@ -104,7 +104,7 @@ class Insurance_IA_SBA_Sequential(FinancialRecoveryPolicy):
 
         # Return out of function if entity has enough money to repair and does not
         # have any insurance coverage.
-        if (entity.recovery_funds.level >= entity.property.damage_value
+        if (entity.recovery_funds.level >= entity.property.damage_value_start
             and entity.insurance == 0.0):
 
             self.writeHadEnough(entity)
@@ -143,7 +143,7 @@ class Insurance_IA_SBA_Sequential(FinancialRecoveryPolicy):
 
         # If entity (still) does not have enough repair money then yield a FEMA IA
         # request, the duration of which is limited by entity's money search patience.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
             # Define a timeout process to represent search patience, with duration
             # equal to the *remaining* patience. Pass the value "Gave up" if the
             # process completes.
@@ -180,7 +180,7 @@ class Insurance_IA_SBA_Sequential(FinancialRecoveryPolicy):
             
         # If entity (still) does not have enough repair money then yield a loan
         # request, the duration of which is limited by entity's money search patience.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
             # Define a timeout process to represent search patience, with duration
             # equal to the *remaining* patience. Pass the value "gave up" if the
             # process completes.
@@ -208,7 +208,7 @@ class Insurance_IA_SBA_Sequential(FinancialRecoveryPolicy):
 
         # If entity (STILL) does not have enough repair money then indicate so and
         # that options have been exhausted.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
             # If write_story is True, then append money search outcome to entity's story.
             self.writeCompletedWithoutEnough(entity, search_duration)
             return
@@ -258,7 +258,7 @@ class Insurance_IA_SBA_Parallel(FinancialRecoveryPolicy):
 
         # Return out of function if entity has enough money to repair and does not
         # have any insurance coverage.
-        if (entity.recovery_funds.level >= entity.property.damage_value
+        if (entity.recovery_funds.level >= entity.property.damage_value_start
             and entity.insurance == 0):
 
             self.writeHadEnough(entity)
@@ -280,7 +280,7 @@ class Insurance_IA_SBA_Parallel(FinancialRecoveryPolicy):
             money_search_start = self.env.now
             
             # At any point the entity has enough money to repair, stop looking.
-            while entity.recovery_funds.level < entity.property.damage_value:
+            while entity.recovery_funds.level < entity.property.damage_value_start:
                 
                 # Yield the patience timeout, the FEMA request, insurance claim request, and the loan request.
                 money_search_outcome = yield find_search_patience | ( try_insurance & try_loan & try_fema )
@@ -313,7 +313,7 @@ class Insurance_IA_SBA_Parallel(FinancialRecoveryPolicy):
             find_search_patience = self.env.timeout(patience_remain, value='gave up')
             
             # At any point the entity has enough money to repair, stop looking.
-            while entity.recovery_funds.level < entity.property.damage_value:
+            while entity.recovery_funds.level < entity.property.damage_value_start:
                 # Yield the patience timeout and the loan request.
                 # No insurance so just yield FEMA & SBA loan request process.
                 money_search_outcome = yield find_search_patience | (try_loan & try_fema)
@@ -338,7 +338,7 @@ class Insurance_IA_SBA_Parallel(FinancialRecoveryPolicy):
 
         # If entity (STILL) does not have enough repair money then indicate so and
         # that options have been exhausted.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
             self.writeCompletedWithoutEnough(entity, search_duration)
             return
 
@@ -393,7 +393,7 @@ class Insurance_SBA_Sequential(FinancialRecoveryPolicy):
         """
         # Return out of function if entity has enough money to repair and does not
         # have any insurance coverage.
-        if (entity.recovery_funds.level >= entity.property.damage_value
+        if (entity.recovery_funds.level >= entity.property.damage_value_start
             and entity.insurance == 0.0):
 
             self.writeHadEnough(entity)
@@ -436,7 +436,7 @@ class Insurance_SBA_Sequential(FinancialRecoveryPolicy):
             
         # If entity (still) does not have enough repair money then yield a loan
         # request, the duration of which is limited by entity's money search patience.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
 
             # Define a timeout process to represent search patience, with duration
             # equal to the *remaining* patience. Pass the value "Gave up" if the
@@ -476,7 +476,7 @@ class Insurance_SBA_Sequential(FinancialRecoveryPolicy):
 
         # If entity (STILL) does not have enough repair money then indicate so and
         # that options have been exhausted.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
             self.writeCompletedWithoutEnough(entity, search_duration)
             return
 
@@ -528,7 +528,7 @@ class Insurance_FirstThen_IA_SBA_Parallel(FinancialRecoveryPolicy):
 
         # Return out of function if entity has enough money to repair and does not
         # have any insurance coverage.
-        if (entity.recovery_funds.level >= entity.property.damage_value
+        if (entity.recovery_funds.level >= entity.property.damage_value_start
             and entity.insurance == 0):
 
             self.writeHadEnough(entity)
@@ -545,7 +545,7 @@ class Insurance_FirstThen_IA_SBA_Parallel(FinancialRecoveryPolicy):
 
             
             # At any point the entity has enough money to repair, stop looking.
-            while entity.recovery_funds.level < entity.property.damage_value:
+            while entity.recovery_funds.level < entity.property.damage_value_start:
                 # Record when money search starts 
                 money_search_start = self.env.now
                 
@@ -609,7 +609,7 @@ class Insurance_FirstThen_IA_SBA_Parallel(FinancialRecoveryPolicy):
             find_search_patience = self.env.timeout(patience_remain, value='gave up')
             
             # At any point the entity has enough money to repair, stop looking.
-            while entity.recovery_funds.level < entity.property.damage_value:
+            while entity.recovery_funds.level < entity.property.damage_value_start:
                 # Yield the patience timeout and the loan request.
                 # No insurance so just yield FEMA & SBA loan request process.
                 money_search_outcome = yield find_search_patience | (try_loan & try_fema)
@@ -618,8 +618,8 @@ class Insurance_FirstThen_IA_SBA_Parallel(FinancialRecoveryPolicy):
                 if try_loan.processed and try_fema.processed:
                     break
 
-                # If patience process completes first, interrupt the insurance claim
-                # request and the loan request before ending process.
+                # If patience process completes first, interrupt the FEMA IA
+                # request and SBA loan request before ending process.
                 if 'gave up' in str(money_search_outcome).lower():
                     if try_loan.is_alive:
                         try_loan.interrupt(self.env.now)
@@ -634,7 +634,8 @@ class Insurance_FirstThen_IA_SBA_Parallel(FinancialRecoveryPolicy):
 
         # If entity (STILL) does not have enough repair money then indicate so and
         # that options have been exhausted.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        
+        if entity.recovery_funds.level < entity.property.damage_value_start:
             self.writeCompletedWithoutEnough(entity, search_duration)
             return
 
@@ -683,7 +684,7 @@ class Insurance_SBA_Parallel(FinancialRecoveryPolicy):
 
         # Return out of function if entity has enough money to repair and does not
         # have any insurance coverage.
-        if (entity.recovery_funds.level >= entity.property.damage_value
+        if (entity.recovery_funds.level >= entity.property.damage_value_start
             and entity.insurance == 0.0):
 
             self.writeHadEnough(entity)
@@ -705,7 +706,7 @@ class Insurance_SBA_Parallel(FinancialRecoveryPolicy):
             money_search_start = self.env.now
             
             # At any point the entity has enough money to repair, stop looking.
-            while entity.recovery_funds.level < entity.property.damage_value:
+            while entity.recovery_funds.level < entity.property.damage_value_start:
 
                 # Yield the patience timeout, the insurance claim request, and the loan request.
                 # Pass result for the process(es) that completes first.
@@ -762,7 +763,7 @@ class Insurance_SBA_Parallel(FinancialRecoveryPolicy):
 
         # If entity (STILL) does not have enough repair money then indicate so and
         # that options have been exhausted.
-        if entity.recovery_funds.level < entity.property.damage_value:
+        if entity.recovery_funds.level < entity.property.damage_value_start:
 
             self.writeCompletedWithoutEnough(entity, search_duration)
             

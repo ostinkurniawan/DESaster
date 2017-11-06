@@ -14,20 +14,66 @@ from desaster.structures import SingleFamilyResidential, Building
 import pandas as pd
 import numpy as np
 
-def importSingleFamilyResidenceStock(env, stock_df):
+def importBuildingStock(env, stock_df, stock_fs):
     """Define, populate and return a SimPy FilterStore with SingleFamilyResidential() 
     objects to represent a vacant housing stock.
     
     Keyword Arguments:
     env -- Pointer to SimPy env environment.
-    stock_df -- Dataframe with required attributes for each vacant home in
+    stock_df -- Dataframe with required attributes for each vacant building in
                 the stock.
+    stock_fs -- Empty Simpy FilterStore to import buildings into.
     """
-    stock_fs = FilterStore(env)
-
     for i in stock_df.index:
-        stock_fs.put(SingleFamilyResidential(stock_df.loc[i]))
-
+        if stock_df.loc[i]['Occupancy'].lower() in ['single family house', 'single family home', 
+                                'single family dwelling', 'single family residence',
+                                'sfr', 'sfh', 'sfd', 'mobile home']:
+            building = SingleFamilyResidential(
+                                        occupancy = stock_df.iloc[i]['Occupancy'],
+                                        tenure = stock_df.iloc[i]['Tenure'],
+                                        address = stock_df.iloc[i]['Address'],
+                                        longitude = stock_df.iloc[i]['Longitude'],
+                                        latitude = stock_df.iloc[i]['Latitude'],
+                                        value = stock_df.iloc[i]['Value'],
+                                        cost = stock_df.iloc[i]['Monthly Cost'],
+                                        area = stock_df.iloc[i]['Area'],
+                                        bedrooms = stock_df.iloc[i]['Bedrooms'],
+                                        bathrooms = stock_df.iloc[i]['Bathrooms'],
+                                        listed = stock_df.iloc[i]['Listed'],
+                                        damage_state = stock_df.iloc[i]['Damage State'],
+                                        building_stock = stock_fs
+                                        )
+        else:
+            building = Building(
+                                occupancy = stock_df.iloc[i]['Occupancy'],
+                                tenure = stock_df.iloc[i]['Tenure'],
+                                address = stock_df.iloc[i]['Address'],
+                                longitude = stock_df.iloc[i]['Longitude'],
+                                latitude = stock_df.iloc[i]['Latitude'],
+                                value = stock_df.iloc[i]['Value'],
+                                cost = stock_df.iloc[i]['Monthly Cost'],
+                                area = stock_df.iloc[i]['Area'],
+                                listed = stock_df.iloc[i]['Listed'],
+                                damage_state = stock_df.iloc[i]['Damage State'],
+                                building_stock = stock_fs
+                                )
+        
+        
+                                
+        owner = Landlord(env, 
+                 name = stock_df.iloc[i]['Landlord'],
+                 savings = stock_df.iloc[i]['Owner Savings'], 
+                insurance = stock_df.iloc[i]['Owner Insurance'],
+                 credit = stock_df.iloc[i]['Owner Credit'],
+                 real_property = None, 
+                    tenant = None,
+                 write_story = False)
+        
+        owner.real_property = building
+        building.owner = owner
+        
+        stock_fs.put(building)
+    
     return stock_fs
 
 def importEntities(env, entities_df, entity_type, building_stock = None, write_story = False):
@@ -66,7 +112,7 @@ def importEntities(env, entities_df, entity_type, building_stock = None, write_s
                                     damage_state = entities_df.iloc[i]['Damage State'],
                                     building_stock = building_stock
                                     )
-            else:
+            else:        
                 raise AttributeError("Specified occupancy type ({0}) associated with entity \'{1}\' not supported. Can't complete import.".format(entities_df.iloc[i]['Occupancy'], entities_df.iloc[i]['Name']))
                 return
             

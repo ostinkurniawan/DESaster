@@ -24,14 +24,15 @@ class Building(object):
     Functions:
     setDamageValue(self, building)
     """
-    def __init__(self, owner = None, occupancy = None, tenure = None, address = None, longitude = None,
-                    latitude = None, value = None, cost = None, area = None,
+    def __init__(self, owner = None, occupancy = None, tenure = None, address = None, 
+                longitude = None, latitude = None, value = None, cost = None, area = None,
                     listed = False, damage_state = None, building_stock = None):
         """
 
         Keyword Arguments:
         owner -- entities.Owner or subclass that represents building owner.
-        occupancy -- The buildings occupancy. DESaster currently supports SFR and mobile home.
+        occupancy -- The buildings occupancy (e.g., single family dwelling, temporary lodging)
+        tenure -- The building's tenure (e.g., rent, owner occupied)
         address -- Building's address
         longitude -- Building's longitude
         latitude -- Building's latitude
@@ -51,8 +52,10 @@ class Building(object):
         self.value = value  # Value of the building in $
         self.damage_state = damage_state  # HAZUS damage state
         self.damage_state_start = damage_state  # Archive starting damage state
+        self.recovery_limit_state = None  # Recovery state based on Burton et al. & HAZUS damage state
+        self.damage_value = None # Dollar value loss due damage
         self.occupancy = occupancy  # Occupancy type of building
-        self.tenure = tenure # Whether owner occupied, rental, shelter, hotel, condo, etc.
+        self.tenure = tenure # Tenure of building
         self.area = area  # Floor area of building
         try:
             self.listed = distutils.util.strtobool(listed)
@@ -74,7 +77,7 @@ class Building(object):
         
         # Set Burton et al. recovery-based limit state
         setRecoveryLimitState(self)
-        self.recovery_limit_state_start = self.recovery_limit_state # Archive original damage value
+        self.recovery_limit_state_start = self.recovery_limit_state # Archive original recovery state
 
 class SingleFamilyResidential(Building):
     """Define class that inherits from Building() for representing the
@@ -82,8 +85,8 @@ class SingleFamilyResidential(Building):
     just adds attribuees of bedrooms and bathroom and verifies a HAZUS-compatible
     residential building type is specified.
     """
-    def __init__(self, owner = None, occupancy = None, tenure = None, address = None, longitude = None,
-                    latitude = None, value = None, cost = None, area = None,
+    def __init__(self, owner = None, occupancy = None, tenure = None, address = None, 
+                    longitude = None, latitude = None, value = None, cost = None, area = None,
                     bedrooms = None, bathrooms = None, listed = False, damage_state = None,
                     building_stock = None):
         """
