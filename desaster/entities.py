@@ -11,7 +11,7 @@ Landlord(Owner)
 
 @author: Scott Miles (milessb@uw.edu)
 """
-from desaster.structures import SingleFamilyResidential, Building
+from desaster.structures import ResidentialBuilding, Building
 from desaster.hazus import setContentsDamageValueHAZUS
 import names, warnings, sys
 from simpy import Container
@@ -51,7 +51,7 @@ class Household:
         income -- Monthly amount of household earnings in $
         savings -- Amount of entity savings in $ 
         credit -- A FICO-like credit score
-        residence -- A building object, such as structures.SingleFamilyResidential()
+        residence -- A building object, such as structures.ResidentialBuilding()
                     that serves as the entity's temporary or permanent residence.
         
         write_story -- Boolean indicating whether to track a entitys story.
@@ -104,8 +104,8 @@ class Household:
         return ''.join(self.story)
 
                             
-    def buy_home(self, search_stock, duration, down_payment_pct = 0.10, housing_ratio = 0.3,
-                        price_pct = 1.1, area_pct = 0.9, rooms_tol = 0,
+    def buy_home(self, search_stock, closing_time, occupancy_list = [], down_payment_pct = 0.10, 
+                    housing_ratio = 0.3, price_pct = 1.1, area_pct = 0.9, rooms_tol = 0,
                         search_patience = float('inf')):
         """A process (generator) representing entity search for permanent housing
         based on housing preferences, available housing stock, and patience finding
@@ -114,10 +114,11 @@ class Household:
         Keyword Arguments:
         
         search_stock -- A SimPy FilterStore that contains one or more
-                        residential building objects (e.g., structures.SingleFamilyResidential)
+                        residential building objects (e.g., structures.ResidentialBuilding)
                         that represent homes owner is searching to purchase.
-        duration -- A distributions.ProbabilityDistribution object, KDE_Distribution object
+        closing_time -- A distributions.ProbabilityDistribution object, KDE_Distribution object
                                     or other type from desaster.distributions
+        occupancy_list -- 
         down_payment_pct -- Percentage of home value required for a down payment
         housing_ratio -- Maximum percentage of monthly income for acceptable monthly costs
         price_pct -- Ratio of existing home value to maximum desirable new home value
@@ -161,13 +162,15 @@ class Household:
         # Return 'Gave up' if timeout process completes.
         home_search_patience = self.env.timeout(patience_end - self.env.now,
             value='Gave up')
+        # Ensure that the household is willing to buy a home that is the same 
+        # as their original home's occupancy type
+        occupancy_list.append(self.prior_properties[0].occupancy.lower())
         
         # Define a FilterStore.get process to find a new home to buy from the vacant
         # for sale stock with similar attributes as *original* property.
-        
         new_home = search_stock.get(lambda findHome:
                         findHome.damage_state == 'None'
-                        and findHome.occupancy.lower() == self.prior_properties[0].occupancy.lower()
+                        and findHome.occupancy.lower() in [x.lower() for x in occupancy_list]
                         and (findHome.bedrooms >= self.prior_properties[0].bedrooms + rooms_tol
                         or findHome.area >= self.prior_properties[0].area * area_pct)
                         and (findHome.value <= self.prior_properties[0].value * price_pct
@@ -189,27 +192,9 @@ class Household:
             del self.prior_residences[0] # Didn't replace home, so delete from prior
             return
         
-        # Define timeout process representing entity's *remaining* search patience.
-        # Return 'Gave up' if timeout process completes.
-        down_payment_patience = self.env.timeout(patience_end - self.env.now,
-                                                value='Gave up')
-
-        # Withdraw 10% down payment; wait for more funds if don't have it yet
+        # Withdraw money for down payment
         down_payment = down_payment_pct * home_search_outcome[new_home].value
-        get_down_payment = self.recovery_funds.get(down_payment)
-        
-        # Yield both the remaining patience timeout and down payment get.
-        down_payment_outcome = yield down_payment_patience | get_down_payment
-        
-        # Exit the function if the patience timeout completes before a suitable
-        # home is found in the housing stock.
-        if down_payment_outcome == {down_payment_patience: 'Gave up'}:
-            yield search_stock.put(home_search_outcome[new_home]) # Didn't buy it afterall
-            self.gave_up_home_buy_search = self.env.now
-            self.writeGaveUpHomeBuySearch()
-            del self.prior_properties[0] # Didn't replace home, so delete from prior
-            del self.prior_residences[0] # Didn't replace home, so delete from prior
-            return
+        self.recovery_funds.get(down_payment)
         
         # If a new home is found before patience runs out set current property's
         # listed attributed to True -- put home up for sale.
@@ -231,7 +216,7 @@ class Household:
             yield self.residence.stock.put(prior_residence)
         
         # Take a timeout equal to specified time to close home purchase
-        yield self.env.timeout(duration.rvs())
+        yield self.env.timeout(closing_time.rvs())
     
         # Add to their story that they vacated their prior residence
         self.writeVacated()
@@ -257,10 +242,9 @@ class Household:
         # entity's story.
         self.writeHomeBuy(down_payment)
 
-    def rent_home(self, search_stock, duration, occupancy = 'single family dwelling',
-                    move_in_ratio = 2.5, housing_ratio = 0.3, area_pct = 0.9,
-                    rooms_tol = 0, notice_time = 20.0, search_patience = float('inf'),
-                    permanent = True):
+    def rent_home(self, search_stock, notice_time, occupancy_list = [],
+                housing_ratio = 0.3, area_pct = 0.9, rooms_tol = 0,
+                search_patience = float('inf'), permanent = True):
 
         """A process (generator) representing entity search for permanent housing
         based on housing preferences, available housing stock, and patience finding
@@ -269,13 +253,12 @@ class Household:
         Keyword Arguments:
     
         search_stock -- A SimPy FilterStore that contains one or more
-                        residential building objects (e.g., structures.SingleFamilyResidential)
+                        residential building objects (e.g., structures.ResidentialBuilding)
                         that represent homes owner is searching to purchase.
         duration -- A distributions.ProbabilityDistribution object, KDE_Distribution object
                                     or other type from desaster.distributions
+        occupancy_list -- 
         housing_ratio -- Maximum percentage of monthly income for acceptable monthly costs
-        move_in_ratio -- A float value that represents move in cost of a new residence
-                        as a ratio of the residence's monthly cost (rent).
         area_pct -- Ratio of existing home area to maximum desirable new home area
         rooms_tol -- Number of fewer or additional bedroms compared to existing home 
                     area that is acceptable for new home
@@ -317,14 +300,20 @@ class Household:
         # for rent stock with similar attributes as original residence.
         
         try:
+            # Ensure the household is willing to rent an occupancy type that is
+            # the same as their original occupancy type
+            occupancy_list.append(self.prior_residences[0].occupancy)
+
             new_home = search_stock.get(lambda findHome:
                             findHome.damage_state == 'None'
-                            and findHome.occupancy.lower() == occupancy.lower()
+                            and findHome.occupancy.lower() in [x.lower() for x in occupancy_list]
                             and (findHome.bedrooms >= self.prior_residences[0].bedrooms + rooms_tol
                             or findHome.area >= self.prior_residences[0].area * area_pct)
+                            and findHome.move_in_cost <= self.recovery_funds.level
                             and findHome.monthly_cost <= (self.income / 12.0) * housing_ratio
                             and findHome.listed == True
                                         )
+
         except AttributeError as err:
             print('Residence attribute not supported by Household.rent_home(): {1}'.format(err))
             return
@@ -345,28 +334,8 @@ class Household:
                 del self.prior_residences[0] # Didn't replace home, so delete from prior
             return
 
-        # Define timeout process representing entity's *remaining* search patience.
-        # Return 'Gave up' if timeout process completes.
-        move_in_cost_patience = self.env.timeout(patience_end - self.env.now,
-                                                value='Gave up')
-
-        # Withdraw down payment; wait for more funds if don't have it yet
-        move_in_cost = move_in_ratio * home_search_outcome[new_home].monthly_cost
-        get_move_in_cost = self.recovery_funds.get(move_in_cost)
-        
-        # Yield both the remaining patience timeout and down payment get.
-        move_in_cost_outcome = yield move_in_cost_patience | get_move_in_cost
-        
-        # Exit the function if the patience timeout completes before a suitable
-        # home is found in the housing stock.
-        if move_in_cost_outcome == {move_in_cost_patience: 'Gave up'}:
-            yield search_stock.put(home_search_outcome[new_home]) # Didn't buy it afterall
-            # Put current residence as a prior residence
-            self.gave_up_home_rent_search = self.env.now
-            self.writeGaveUpHomeRentSearchMoney()
-            if self.residence:
-                del self.prior_residences[0] # Didn't replace home, so delete from prior
-            return
+        # Withdraw money to pay for move-in costs
+        self.recovery_funds.get(home_search_outcome[new_home].move_in_cost)
         
         # If a new home is found before patience runs change current residence's 
         # listed state to True to indicate residence is for rent (if tenant has a 
@@ -377,9 +346,10 @@ class Household:
                                                 )
             prior_residence.listed = True
             yield self.residence.stock.put(prior_residence)
-        # 
-        # Take a timeout equal to specified to notice time before can move in
-        yield self.env.timeout(duration.rvs())
+        
+        # Take a timeout equal to length of time specified before household can 
+        # occupy the home
+        self.env.timeout(notice_time.rvs())
         
         # Add to their story that they vacated their prior residence
         self.writeVacated()
@@ -403,9 +373,7 @@ class Household:
         
         # If write_story is True, then write results of successful home search to
         # entity's story.
-        
-        self.writeHomeRent(move_in_cost)
-            
+        self.writeHomeRent()
     
     def occupy_permanent(self, duration, callbacks = None):
         """Define process for PERMANENTLY occupying a residence--e.g., amount of time it takes
@@ -499,13 +467,6 @@ class Household:
                 'On day {0:,.0f}, after a {1:,.0f} day search, {2} could not find a {3} rental in the local area. '.format(
                             self.env.now, self.env.now - self.home_rent_put, self.name.title(),
                             self.prior_residences[0].occupancy.lower())
-                )  
-    def writeGaveUpHomeRentSearchMoney(self):
-        if self.write_story:
-            self.story.append(
-                'On day {0:,.0f}, after a {1:,.0f} day search, {2} was unable to pay for move-in costs for a {3} rental in the local area and gave up looking. '.format(
-                            self.env.now, self.env.now - self.home_rent_put, self.name.title(),
-                            self.prior_residences[0].occupancy.lower())
                 )                          
                             
     def writeHomeBuy(self, down_payment):    
@@ -516,24 +477,31 @@ class Household:
                 self.property.occupancy.lower(), self.property.address, down_payment)
                             )
                         
-    def writeHomeRent(self, move_in_cost):      
+    def writeHomeRent(self):      
         if self.write_story:
             self.story.append(
-                'On day {0:,.0f}, {1} rented a {2} owned by {3} at {4} with a rent of ${5:,.0f} and move in cost of ${6:,.0f}. '.format(
+                'On day {0:,.0f}, {1} found a {2} {3} owned by {4} at {5} with a monthly rent of ${6:,.0f} and move in cost of ${7:,.0f}. '.format(
                 self.home_rent_get, self.name.title(), self.residence.occupancy.lower(),
-                self.landlord.name, self.residence.address, self.residence.monthly_cost, 
-                move_in_cost)
+                self.residence.tenure.lower(), self.landlord.name, self.residence.address,
+                self.residence.monthly_cost, self.residence.move_in_cost)
                 ) 
     
-    def writeOccupy(self):          
+    def writeOccupy(self):
         if self.write_story:
-            self.story.append(
-                            "{0} moved into the {1} {2} at {3} {4:.0f} days after the event. ".format(
-                            self.name.title(), self.residence.tenure.lower(),
-                            self.residence.occupancy.lower(), self.residence.address,
-                            self.occupy_get)
-                            )  
-                        
+            if len(self.prior_residences) == 0:
+                self.story.append(
+                                "{0} reoccupied the {1} {2} at {3} {4:.0f} days after the event. ".format(
+                                self.name.title(), self.residence.tenure.lower(),
+                                self.residence.occupancy.lower(), self.residence.address,
+                                self.occupy_get)
+                                )
+            else:
+                self.story.append(
+                                "{0} occupied the {1} {2} at {3} {4:.0f} days after the event. ".format(
+                                self.name.title(), self.residence.tenure.lower(),
+                                self.residence.occupancy.lower(), self.residence.address,
+                                self.occupy_get)
+                                )        
     def writeVacated(self):
         if self.write_story:
             self.story.append('{0} vacated the {1} {2} at {3}. '.format(
@@ -558,7 +526,7 @@ class Owner:
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
-        real_property -- A building object, such as structures.SingleFamilyResidential()
+        real_property -- A building object, such as structures.ResidentialBuilding()
         write_story -- Boolean indicating whether to track an entity's story.
         
         Returns or Attribute Changes:
@@ -632,7 +600,7 @@ class OwnerHousehold(Household):
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
-        real_property -- A building object, such as structures.SingleFamilyResidential()
+        real_property -- A building object, such as structures.ResidentialBuilding()
         write_story -- Boolean indicating whether to track an entity's story.
         
         Returns or Attribute Changes:
@@ -680,7 +648,7 @@ class RenterHousehold(Household):
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
-        residence -- A building object, such as structures.SingleFamilyResidential()
+        residence -- A building object, such as structures.ResidentialBuilding()
                     that serves as the entity's temporary or permanent residence.
         landlord -- An OwnerHousehold object that represent's the renter's landlord.
         write_story -- Boolean indicating whether to track an entity's story.
@@ -730,7 +698,7 @@ class Landlord(Owner):
         savings -- Amount of entity savings in $ 
         insurance -- Hazard-specific insurance coverage: coverage / residence.value
         credit -- A FICO-like credit score
-        real_property -- A building object, such as structures.SingleFamilyResidential()
+        real_property -- A building object, such as structures.ResidentialBuilding()
         tenant -- A RenterHousehold object that serves landlord's tenant
         write_story -- Boolean indicating whether to track an entity's story.
         

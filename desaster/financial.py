@@ -545,7 +545,7 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
                 self.writeWithdraw(entity, 'SBA')
                 return
 
-            # If loan amount is greater than $25k, it requires collateral and more paperwork
+            # If loan amount is greater than $25k, it requires colateral and more paperwork
             if entity.sba_amount > 25000:
                 
                 # Receives $25k immediately as initial disbursement
@@ -554,11 +554,8 @@ class RealPropertyLoanSBA(FinancialRecoveryProgram):
 
                 self.writeFirstDisbursement(entity)
                 
-                #
-                # %%%% EVENTUALLY MAKE WAIT FOR A BUILDING PERMIT TO BE ISSUED %%%
-                # %%% FOR NOW: Yield another timeout equal to initial process application duration %%%
-                #
-
+                # Yield another timeout equal to initial process application duration
+                # This is a proxy for SBA doing further paperwork
                 yield self.env.timeout(self.duration.rvs())
 
                 # Update loan amount (in case other processes in parallel)

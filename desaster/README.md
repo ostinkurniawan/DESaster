@@ -28,7 +28,7 @@ Classes:
 
 Classes:
 `Building`, 
-`SingleFamilyResidential(Building)`
+`ResidentialBuilding(Building)`
 
 `financial.py` **Module of classes for implementing DESaster financial recovery programs.**
 

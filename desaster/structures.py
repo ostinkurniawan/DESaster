@@ -5,7 +5,7 @@ entities.
 
 Classes:
 Building(object)
-SingleFamilyResidential(Building)
+ResidentialBuilding(Building)
 
 @author: Scott Miles (milessb@uw.edu)
 """
@@ -25,8 +25,8 @@ class Building(object):
     setDamageValue(self, building)
     """
     def __init__(self, owner = None, occupancy = None, tenure = None, address = None, 
-                longitude = None, latitude = None, value = None, cost = None, area = None,
-                    listed = False, damage_state = None, building_stock = None):
+                longitude = None, latitude = None, value = None, monthly_cost = None, move_in_cost = None,
+                area = None, listed = False, damage_state = None, building_stock = None):
         """
 
         Keyword Arguments:
@@ -48,7 +48,8 @@ class Building(object):
         """
         # Attributes
         self.owner = owner  # Owner of building as Household() entity
-        self.monthly_cost = cost  # Monthly rent/mortgage of building
+        self.monthly_cost = monthly_cost  # Monthly rent/mortgage of building
+        self.move_in_cost = move_in_cost
         self.value = value  # Value of the building in $
         self.damage_state = damage_state  # HAZUS damage state
         self.damage_state_start = damage_state  # Archive starting damage state
@@ -79,15 +80,15 @@ class Building(object):
         setRecoveryLimitState(self)
         self.recovery_limit_state_start = self.recovery_limit_state # Archive original recovery state
 
-class SingleFamilyResidential(Building):
+class ResidentialBuilding(Building):
     """Define class that inherits from Building() for representing the
     attributes and methods associated with a single family residence. Currently
     just adds attribuees of bedrooms and bathroom and verifies a HAZUS-compatible
     residential building type is specified.
     """
     def __init__(self, owner = None, occupancy = None, tenure = None, address = None, 
-                    longitude = None, latitude = None, value = None, cost = None, area = None,
-                    bedrooms = None, bathrooms = None, listed = False, damage_state = None,
+                    longitude = None, latitude = None, value = None, monthly_cost = None, move_in_cost = None,
+                    area = None, bedrooms = None, bathrooms = None, listed = False, damage_state = None,
                     building_stock = None):
         """
         Keyword Arguments:
@@ -113,7 +114,7 @@ class SingleFamilyResidential(Building):
         """
 
         Building.__init__(self, owner, occupancy, tenure, address, longitude,
-                        latitude, value, cost, area,
+                        latitude, value, monthly_cost, move_in_cost, area,
                         listed, damage_state, building_stock) 
 
         self.bedrooms = bedrooms  # Number of bedrooms in building
@@ -121,7 +122,8 @@ class SingleFamilyResidential(Building):
 
         # Verify that building dataframe has expected occupancy types
         # Raise warning, if not (but continue with simulation)
-        if not occupancy.lower() in ('single family dwelling', 'mobile home'):
-            warnings.showwarning('Warning: SingleFamilyResidential not compatible with given occupancy type: {0}'.format(
+        if not occupancy.lower() in ('single family dwelling', 'mobile home',
+                                    'temporary lodging'):
+            warnings.showwarning('Warning: ResidentialBuilding not compatible with given occupancy type: {0}'.format(
                     occupancy.title()), DeprecationWarning, filename = sys.stderr,
                                     lineno=661)

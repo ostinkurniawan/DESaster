@@ -105,7 +105,7 @@ class InspectionProgram(TechnicalRecoveryProgram):
     """ A class for representing staff allocation and process duration associated
     with post-event building inspections or tagging. No actual damage
     assessment (valuation) is done by the class process. It is done in the
-    instantiation of the building object (e.g., entities.SingleFamilyResidential.damage_value)
+    instantiation of the building object (e.g., entities.ResidentialBuilding.damage_value)
     based on inputted damage_state and HAZUS lookup tables.
 
     Methods:
@@ -131,7 +131,7 @@ class InspectionProgram(TechnicalRecoveryProgram):
         with post-event building inspections.
 
         Keyword Arguments:
-        structure -- Some structures.py object, such as structures.SingleFamilyResidential()
+        structure -- Some structures.py object, such as structures.ResidentialBuilding()
         entity -- An entity (e.g., entities.OwnerHousehold()) that initiates
                     and benefits from the process.
         callbacks -- a generator function containing processes to start after the
@@ -201,7 +201,7 @@ class EngineeringAssessment(TechnicalRecoveryProgram):
     damage assessment prior to design, permitting, and repair/construction of
     a building. No actual damage valuation is done by the class process, though
     it would conceputally make sense. It is done in the instantiation of the
-    building object (e.g., entities.SingleFamilyResidential.damage_value)
+    building object (e.g., entities.ResidentialBuilding.damage_value)
     based on inputted damage_state and HAZUS lookup tables.
 
     Methods:
@@ -227,7 +227,7 @@ class EngineeringAssessment(TechnicalRecoveryProgram):
         building.
 
         Keyword Arguments:
-        structure -- Some structures.py object, such as structures.SingleFamilyResidential()
+        structure -- Some structures.py object, such as structures.ResidentialBuilding()
         entity -- An entity (e.g., entities.OwnerHousehold()) that initiates
                     and benefits from the process.
         callbacks -- a generator function containing processes to start after the
@@ -307,7 +307,7 @@ class PermitProgram(TechnicalRecoveryProgram):
         building.
 
         Keyword Arguments:
-        structure -- Some structures.py object, such as structures.SingleFamilyResidential()
+        structure -- Some structures.py object, such as structures.ResidentialBuilding()
         entity -- An entity (e.g., entities.OwnerHousehold()) that initiates
                     and benefits from the process.
         callbacks -- a generator function containing processes to start after the
@@ -397,7 +397,7 @@ class RepairProgram(TechnicalRecoveryProgram):
         and building materials.
 
         Keyword Arguments:
-        structure -- Some structures.py object, such as structures.SingleFamilyResidential()
+        structure -- Some structures.py object, such as structures.ResidentialBuilding()
         entity -- An entity (e.g., entities.OwnerHousehold()) that initiates
                     and benefits from the process.
         callbacks -- a generator function containing processes to start after the
@@ -515,7 +515,7 @@ class DemolitionProgram(TechnicalRecoveryProgram):
         """A process to demolition a building structure based on available contractors.
 
         Keyword Arguments:
-        structure -- Some structures.py object, such as structures.SingleFamilyResidential()
+        structure -- Some structures.py object, such as structures.ResidentialBuilding()
         entity -- An entity (e.g., entities.OwnerHousehold()) that initiates
                     and benefits from the process.
         callbacks -- a generator function containing processes to start after the

@@ -129,7 +129,7 @@ def dashboard(df, sim_time = 180, lat = 43.223628, lon = -90.294633,
     mapplot.api_key = "AIzaSyBIwu-YI4jgBfzconosHqtQoeZ40oH-bhU"
 
     #data wrangling for JS interaction
-    home_status_formap = pd.concat([home_status_colors.copy(), df['latitude'], df['longitude']], axis=1)
+    home_status_formap = pd.concat([home_status_colors.copy(), df['latitude'], dflongitude], axis=1)
     home_status_formap['y'] = np.nan #dummy column
     home_status_formap['story'] = df['story']
     home_status_formap.columns = home_status_formap.columns.astype(str)
@@ -235,51 +235,43 @@ def folium_map(df, lat = 43.223628, lon = -90.294633, outfile = 'folium_map.html
     slight_group = FeatureGroup(name='Slight Damage')
     none_group = FeatureGroup(name='No Damage')
 
-    count = 0
+    for row in df.itertuples():
 
-    for i in df.iterrows():
-        count += 1
-
-        if i[1].damage_state_start == 'Complete':
+        if row.damage_state_start == 'Complete':
             try:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
-                              popup=i[1].story, icon=folium.Icon("darkred", icon='home')).add_to(complete_group)
+                folium.Marker(location = [row.latitude, row.longitude],
+                              popup=row.story, icon=folium.Icon("darkred", icon='home')).add_to(complete_group)
             except AttributeError:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
+                folium.Marker(location = [row.latitude, row.longitude],
                               icon=folium.Icon("darkred", icon='home')).add_to(complete_group)
-        elif i[1].damage_state_start == 'Extensive':
+        elif row.damage_state_start == 'Extensive':
             try:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
-                              popup=i[1].story, icon=folium.Icon("red", icon='home')).add_to(extensive_group)
+                folium.Marker(location = [row.latitude, row.longitude],
+                              popup=row.story, icon=folium.Icon("red", icon='home')).add_to(extensive_group)
             except AttributeError:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
+                folium.Marker(location = [row.latitude, row.longitude],
                               icon=folium.Icon("red", icon='home')).add_to(extensive_group)
-        elif i[1].damage_state_start == 'Moderate':
+        elif row.damage_state_start == 'Moderate':
             try:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
-                              popup=i[1].story, icon=folium.Icon("orange", icon='home')).add_to(moderate_group)
+                folium.Marker(location = [row.latitude, row.longitude],
+                              popup=row.story, icon=folium.Icon("orange", icon='home')).add_to(moderate_group)
             except AttributeError:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
+                folium.Marker(location = [row.latitude, row.longitude],
                               icon=folium.Icon("orange", icon='home')).add_to(moderate_group)
-        elif i[1].damage_state_start == 'Slight':
+        elif row.damage_state_start == 'Slight':
             try:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
-                              popup=i[1].story, icon=folium.Icon("lightgreen", icon='home')).add_to(slight_group)
+                folium.Marker(location = [row.latitude, row.longitude],
+                              popup=row.story, icon=folium.Icon("lightgreen", icon='home')).add_to(slight_group)
             except AttributeError:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
+                folium.Marker(location = [row.latitude, row.longitude],
                               icon=folium.Icon("lightgreen", icon='home')).add_to(slight_group)
         else:
             try:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
-                              popup=i[1].story, icon=folium.Icon("green", icon='home')).add_to(none_group)
+                folium.Marker(location = [row.latitude, row.longitude],
+                              popup=row.story, icon=folium.Icon("green", icon='home')).add_to(none_group)
             except AttributeError:
-                folium.Marker(location = [i[1].latitude, i[1].longitude],
+                folium.Marker(location = [row.latitude, row.longitude],
                               icon=folium.Icon("green", icon='home')).add_to(none_group)
-
-    #     if count > 50:
-    #         break
-    #     else:
-    #         continue
 
     map.add_child(complete_group)
     map.add_child(extensive_group)
